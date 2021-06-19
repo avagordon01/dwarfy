@@ -11,7 +11,7 @@
 #include "elfy.hh"
 
 void do_stuff(std::span<std::byte> data) {
-    elfy e{data};
+    elfy::elf e{data};
     //e.print_section_names<uint64_t>();
     if (e.get_section_by_name<uint64_t>(".debug_ranges")) {
         printf("debug ranges!\n");
