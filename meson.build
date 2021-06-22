@@ -18,10 +18,19 @@ add_project_arguments(
   language: 'cpp'
 )
 
+expected_dep = declare_dependency(
+  include_directories: [
+    'vendor/expected/include',
+  ]
+)
+
 executable(
   'elfy-test',
   [
     'elfy-test.cc',
+  ],
+  dependencies: [
+    expected_dep,
   ],
   install: true,
 )

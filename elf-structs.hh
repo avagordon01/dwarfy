@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <cstddef>
 #include <span>
@@ -26,7 +28,7 @@ void read(R& r, elf_ident& i) {
         i.magic[3] == 'F'
     )) {
         fprintf(stderr, "not an elf file!\n");
-        return;
+        abort();
     }
 
     r.input_size_t = (i.bitwidth == 1 ? sizeof(uint32_t) : sizeof(uint64_t));
