@@ -10,6 +10,7 @@
 
 #include "elfy.hh"
 #include "dwarfy.hh"
+#include "leb128.hh"
 
 void do_stuff(std::span<std::byte> data) {
     elfy::elf e{data};
@@ -26,6 +27,7 @@ void do_stuff(std::span<std::byte> data) {
 }
 
 int main(int argc, char *argv[]) {
+    uleb_test();
     for (argv++, argc--; argc > 0; argv++, argc--) {
         char* filename = *argv;
         int fd = open(filename, O_RDONLY);
