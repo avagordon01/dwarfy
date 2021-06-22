@@ -19,29 +19,16 @@ struct elf {
 
     std::span<std::byte> data;
     span_reader reader;
-    elf_ident& ident;
+    elf_ident ident;
     elf_header header;
     std::span<program_header<T>> program_headers;
     std::span<section_header<T>> section_headers;
     std::span<std::byte> section_names;
     elf(std::span<std::byte> data_):
         data(data_),
-        reader(data),
-        ident(from_bytes<elf_ident>(data))
+        reader(data)
     {
-        if (!(
-            ident.magic[0] == 0x7f &&
-            ident.magic[1] == 'E' &&
-            ident.magic[2] == 'L' &&
-            ident.magic[3] == 'F'
-        )) {
-            fprintf(stderr, "not an elf file!\n");
-            return;
-        }
-
-        reader.read_bytes(sizeof(elf_ident));
-        reader.input_size_t = (ident.bitwidth == 1 ? sizeof(uint32_t) : sizeof(uint64_t));
-        reader.input_endianness = (ident.endianness == 1 ? std::endian::little : std::endian::big);
+        read(reader, ident);
         read(reader, header);
 
         assert(header.phentsize == sizeof(program_header<T>));

@@ -15,6 +15,24 @@ struct elf_ident {
     uint8_t padding[7];
 };
 
+template<typename R>
+void read(R& r, elf_ident& i) {
+    i = from_bytes<elf_ident>(r.read_bytes(sizeof(elf_ident)));
+
+    if (!(
+        i.magic[0] == 0x7f &&
+        i.magic[1] == 'E' &&
+        i.magic[2] == 'L' &&
+        i.magic[3] == 'F'
+    )) {
+        fprintf(stderr, "not an elf file!\n");
+        return;
+    }
+
+    r.input_size_t = (i.bitwidth == 1 ? sizeof(uint32_t) : sizeof(uint64_t));
+    r.input_endianness = (i.endianness == 1 ? std::endian::little : std::endian::big);
+}
+
 struct input_size_t {
     uint64_t data;
 };
