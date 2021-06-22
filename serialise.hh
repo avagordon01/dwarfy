@@ -21,6 +21,8 @@ std::span<Y> span_from_bytes(std::span<std::byte> bytes, size_t num = 1) {
 
 struct span_reader {
     std::span<std::byte> data;
+    size_t input_size_t;
+    std::endian input_endianness;
 
     span_reader(std::span<std::byte> data_):
         data(data_)

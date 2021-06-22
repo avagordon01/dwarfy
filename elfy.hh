@@ -40,13 +40,9 @@ struct elf {
         }
 
         reader.read_bytes(sizeof(elf_ident));
+        reader.input_size_t = (ident.bitwidth == 1 ? sizeof(uint32_t) : sizeof(uint64_t));
+        reader.input_endianness = (ident.endianness == 1 ? std::endian::little : std::endian::big);
         read(reader, header);
-
-        //TODO support big endianness
-        assert(ident.endianness == 1);
-
-        //TODO handle 32 bit
-        assert(ident.bitwidth == 2);
 
         assert(header.phentsize == sizeof(program_header<T>));
         program_headers = span_from_bytes<program_header<T>>(data.subspan(header.phoff.data), header.phnum);

@@ -17,25 +17,11 @@ struct elf_ident {
 
 struct input_size_t {
     uint64_t data;
-    std::size_t size;
-
-    input_size_t():
-        data(0),
-        size(sizeof(uint64_t))
-    {}
-
-    input_size_t(std::size_t size_):
-        size(size_)
-    {}
-
-    size_t get_size() {
-        return size;
-    }
 };
 
 template<typename R>
 void read(R& r, input_size_t& x) {
-    x.data = from_bytes<uint64_t>(r.read_bytes(x.size));
+    x.data = from_bytes<uint64_t>(r.read_bytes(r.input_size_t));
 }
 
 enum class type : uint16_t {
@@ -68,8 +54,6 @@ struct elf_header {
     uint16_t shentsize;
     uint16_t shnum;
     uint16_t shstrndx;
-
-    elf_header() {}
 };
 
 template<typename R, typename T>
