@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
 if [[ ! -d out ]]; then
     PKG_CONFIG_PATH=./libelfin/elf:./libelfin/dwarf \

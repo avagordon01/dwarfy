@@ -3,6 +3,8 @@
 #include <span>
 #include <string_view>
 
+#include "serialise.hh"
+
 struct elf_ident {
     uint8_t magic[4];
     uint8_t bitwidth;
@@ -13,24 +15,52 @@ struct elf_ident {
     uint8_t padding[7];
 };
 
-template<typename T>
+struct input_size_t {
+    uint64_t data;
+    std::size_t size;
+
+    input_size_t():
+        data(0),
+        size(sizeof(uint64_t))
+    {}
+
+    input_size_t(std::size_t size_):
+        size(size_)
+    {}
+
+    size_t get_size() {
+        return size;
+    }
+};
+
+template<typename R>
+void read(R& r, input_size_t& x) {
+    x.data = from_bytes<uint64_t>(r.read_bytes(x.size));
+}
+
+enum class type : uint16_t {
+    NONE = 0,
+    REL = 1,
+    EXEC = 2,
+    DYN = 3,
+    CORE = 4,
+    LOOS = 0xFE00,
+    HIOS = 0xFEFF,
+    LOPROC = 0xFF00,
+    HIPROC = 0xFFFF,
+};
+template<typename R>
+void read(R& r, enum type& v) {
+    v = from_bytes<enum type>(r.read_bytes(sizeof(v)));
+}
+
 struct elf_header {
-    enum class type : uint16_t {
-        NONE = 0,
-        REL = 1,
-        EXEC = 2,
-        DYN = 3,
-        CORE = 4,
-        LOOS = 0xFE00,
-        HIOS = 0xFEFF,
-        LOPROC = 0xFF00,
-        HIPROC = 0xFFFF,
-    } type;
+    enum type type;
     uint16_t machine;
     uint32_t version;
-    T entry;
-    T phoff;
-    T shoff;
+    input_size_t entry;
+    input_size_t phoff;
+    input_size_t shoff;
     uint32_t flags;
     uint16_t ehsize;
     uint16_t phentsize;
@@ -38,7 +68,32 @@ struct elf_header {
     uint16_t shentsize;
     uint16_t shnum;
     uint16_t shstrndx;
+
+    elf_header() {}
 };
+
+template<typename R, typename T>
+requires std::is_scalar_v<T>
+void read(R& r, T& v) {
+    v = from_bytes<T>(r.read_bytes(sizeof(v)));
+}
+
+template<typename R>
+void read(R& r, elf_header& h) {
+    read(r, h.type);
+    read(r, h.machine);
+    read(r, h.version);
+    read(r, h.entry);
+    read(r, h.phoff);
+    read(r, h.shoff);
+    read(r, h.flags);
+    read(r, h.ehsize);
+    read(r, h.phentsize);
+    read(r, h.phnum);
+    read(r, h.shentsize);
+    read(r, h.shnum);
+    read(r, h.shstrndx);
+}
 
 template<typename T>
 struct program_header;

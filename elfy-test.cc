@@ -9,10 +9,11 @@
 #include <cstdio>
 
 #include "elfy.hh"
+#include "dwarfy.hh"
 
 void do_stuff(std::span<std::byte> data) {
     elfy::elf e{data};
-    //e.print_section_names<uint64_t>();
+    e.print_section_names<uint64_t>();
     if (e.get_section_by_name<uint64_t>(".debug_ranges")) {
         printf("debug ranges!\n");
     } else {
@@ -20,6 +21,8 @@ void do_stuff(std::span<std::byte> data) {
     }
     printf("%lu program headers\n", e.program_headers.size());
     printf("%lu section headers\n", e.section_headers.size());
+
+    //dwarfy::dwarf d{e};
 }
 
 int main(int argc, char *argv[]) {
