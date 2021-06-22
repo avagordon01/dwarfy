@@ -34,3 +34,41 @@ struct span_reader {
         return r;
     }
 };
+
+template<typename T>
+T fix_endianness(T value, std::endian input_endianness = std::endian::little) {
+    if constexpr (!std::is_scalar_v<T>) {
+        return value;
+    }
+    if (input_endianness == std::endian::native) {
+        return value;
+    }
+    using A = std::array<std::byte, sizeof(T)>;
+    A array = std::bit_cast<A>(value);
+    std::ranges::reverse(array);
+    return std::bit_cast<T>(array);
+}
+
+template<typename R, typename T>
+requires std::is_scalar_v<T>
+void read(R& r, T& v) {
+    v = fix_endianness(from_bytes<T>(r.read_bytes(sizeof(v))), r.input_endianness);
+}
+
+struct input_size_t {
+    uint64_t data;
+    operator uint64_t() const {
+        return data;
+    };
+};
+
+template<typename R>
+void read(R& r, input_size_t& x) {
+    x.data = from_bytes<uint64_t>(r.read_bytes(r.input_size_t));
+}
+
+template<typename T>
+span_reader& operator&(span_reader &r, T& v) {
+    read(r, v);
+    return r;
+}

@@ -44,15 +44,6 @@ void read(R& r, elf_ident& i) {
     r.input_endianness = (i.endianness == 1 ? std::endian::little : std::endian::big);
 }
 
-struct input_size_t {
-    uint64_t data;
-};
-
-template<typename R>
-void read(R& r, input_size_t& x) {
-    x.data = from_bytes<uint64_t>(r.read_bytes(r.input_size_t));
-}
-
 enum class type : uint16_t {
     NONE = 0,
     REL = 1,
@@ -80,32 +71,6 @@ struct elf_header {
     uint16_t shnum;
     uint16_t shstrndx;
 };
-
-template<typename T>
-T fix_endianness(T value, std::endian input_endianness = std::endian::little) {
-    if constexpr (!std::is_scalar_v<T>) {
-        return value;
-    }
-    if (input_endianness == std::endian::native) {
-        return value;
-    }
-    using A = std::array<std::byte, sizeof(T)>;
-    A array = std::bit_cast<A>(value);
-    std::ranges::reverse(array);
-    return std::bit_cast<T>(array);
-}
-
-template<typename R, typename T>
-requires std::is_scalar_v<T>
-void read(R& r, T& v) {
-    v = fix_endianness(from_bytes<T>(r.read_bytes(sizeof(v))), r.input_endianness);
-}
-
-template<typename T>
-span_reader& operator&(span_reader &r, T& v) {
-    read(r, v);
-    return r;
-}
 
 template<typename R>
 void read(R& r, elf_header& h) {
@@ -176,10 +141,10 @@ struct elf {
         read(reader, header);
 
         assert(header.phentsize == sizeof(program_header<T>));
-        program_headers = span_from_bytes<program_header<T>>(data.subspan(header.phoff.data), header.phnum);
+        program_headers = span_from_bytes<program_header<T>>(data.subspan(header.phoff), header.phnum);
 
         assert(header.shentsize == sizeof(section_header<T>));
-        section_headers = span_from_bytes<section_header<T>>(data.subspan(header.shoff.data), header.shnum);
+        section_headers = span_from_bytes<section_header<T>>(data.subspan(header.shoff), header.shnum);
 
         section_names = section_headers[header.shstrndx].data(*this);
     }
