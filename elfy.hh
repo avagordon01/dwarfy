@@ -84,21 +84,15 @@ void read(R& r, T& v) {
     v = from_bytes<T>(r.read_bytes(sizeof(v)));
 }
 
+template<typename T>
+span_reader& operator&(span_reader &r, T& v) {
+    read(r, v);
+    return r;
+}
+
 template<typename R>
 void read(R& r, elf_header& h) {
-    read(r, h.type);
-    read(r, h.machine);
-    read(r, h.version);
-    read(r, h.entry);
-    read(r, h.phoff);
-    read(r, h.shoff);
-    read(r, h.flags);
-    read(r, h.ehsize);
-    read(r, h.phentsize);
-    read(r, h.phnum);
-    read(r, h.shentsize);
-    read(r, h.shnum);
-    read(r, h.shstrndx);
+    r & h.type & h.machine & h.version & h.entry & h.phoff & h.shoff & h.flags & h.ehsize & h.phentsize & h.phnum & h.shentsize & h.shnum & h.shstrndx;
 }
 
 template<typename T>
