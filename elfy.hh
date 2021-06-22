@@ -8,6 +8,9 @@
 #include <iostream>
 #include <span>
 #include <string_view>
+#include <array>
+#include <bit>
+#include <algorithm>
 
 #include "serialise.hh"
 
@@ -78,10 +81,24 @@ struct elf_header {
     uint16_t shstrndx;
 };
 
+template<typename T>
+T fix_endianness(T value, std::endian input_endianness = std::endian::little) {
+    if constexpr (!std::is_scalar_v<T>) {
+        return value;
+    }
+    if (input_endianness == std::endian::native) {
+        return value;
+    }
+    using A = std::array<std::byte, sizeof(T)>;
+    A array = std::bit_cast<A>(value);
+    std::ranges::reverse(array);
+    return std::bit_cast<T>(array);
+}
+
 template<typename R, typename T>
 requires std::is_scalar_v<T>
 void read(R& r, T& v) {
-    v = from_bytes<T>(r.read_bytes(sizeof(v)));
+    v = fix_endianness(from_bytes<T>(r.read_bytes(sizeof(v))), r.input_endianness);
 }
 
 template<typename T>
