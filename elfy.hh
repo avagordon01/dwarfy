@@ -16,14 +16,40 @@
 
 namespace elfy {
 
-struct elf_ident {
+class elf_ident {
     uint8_t magic[4];
-    uint8_t bitwidth;
-    uint8_t endianness;
+    uint8_t bitwidth_;
+    uint8_t endianness_;
     uint8_t version;
     uint8_t abi;
     uint8_t abiversion;
     uint8_t padding[7];
+
+    template<typename R>
+    friend void read(R& r, elf_ident& i);
+    void check() {
+        assert(bitwidth_ == 1 || bitwidth_ == 2);
+        assert(endianness_ == 1 || endianness_ == 2);
+        assert(version == 1);
+    }
+    std::endian endianness() {
+        if (endianness_ == 1) {
+            return std::endian::little;
+        } else if (endianness_ == 2) {
+            return std::endian::big;
+        } else {
+            assert(false && "bad ELF endian field");
+        }
+    }
+    std::size_t bitwidth() {
+        if (bitwidth_ == 1) {
+            return sizeof(uint32_t);
+        } else if (bitwidth_ == 2) {
+            return sizeof(uint64_t);
+        } else {
+            assert(false && "bad ELF bitwidth field");
+        }
+    }
 };
 
 template<typename R>
@@ -40,24 +66,12 @@ void read(R& r, elf_ident& i) {
         abort();
     }
 
-    r.input_size_t = (i.bitwidth == 1 ? sizeof(uint32_t) : sizeof(uint64_t));
-    r.input_endianness = (i.endianness == 1 ? std::endian::little : std::endian::big);
+    r.input_size_t = i.bitwidth();
+    r.input_endianness = i.endianness();
 }
 
-enum class type : uint16_t {
-    NONE = 0,
-    REL = 1,
-    EXEC = 2,
-    DYN = 3,
-    CORE = 4,
-    LOOS = 0xFE00,
-    HIOS = 0xFEFF,
-    LOPROC = 0xFF00,
-    HIPROC = 0xFFFF,
-};
-
-struct elf_header {
-    enum type type;
+class elf_header {
+    uint16_t type;
     uint16_t machine;
     uint32_t version;
     input_size_t entry;
@@ -70,6 +84,13 @@ struct elf_header {
     uint16_t shentsize;
     uint16_t shnum;
     uint16_t shstrndx;
+
+    friend class elf;
+    template<typename R>
+    friend void read(R& r, elf_header& h);
+    void check() {
+        assert(version == 1);
+    }
 };
 
 template<typename R>
@@ -78,9 +99,9 @@ void read(R& r, elf_header& h) {
 }
 
 template<typename T>
-struct program_header;
+class program_header;
 template<>
-struct program_header<uint32_t> {
+class program_header<uint32_t> {
     uint32_t type;
     uint32_t offset;
     uint32_t vaddr;
@@ -92,7 +113,7 @@ struct program_header<uint32_t> {
 };
 
 template<>
-struct program_header<uint64_t> {
+class program_header<uint64_t> {
     uint32_t type;
     uint32_t flags;
     uint64_t offset;
@@ -103,11 +124,11 @@ struct program_header<uint64_t> {
     uint64_t align;
 };
 
-struct elf;
+class elf;
 
 template<typename T>
-struct section_header {
-    uint32_t name;
+class section_header {
+    uint32_t name_;
     uint32_t type;
     T flags;
     T addr;
@@ -118,14 +139,16 @@ struct section_header {
     T addralign;
     T entsize;
 
-    std::string_view get_name(elf& e) const;
+public:
+    std::string_view name(elf& e) const;
     std::span<std::byte> data(elf& e) const;
 };
 
-struct elf {
+class elf {
 
     using T = uint64_t;
 
+public:
     std::span<std::byte> data;
     span_reader reader;
     elf_ident ident;
@@ -151,7 +174,7 @@ struct elf {
     template<typename T>
     section_header<T>* get_section_by_name(const std::string_view& key) {
         for (auto& sh: section_headers) {
-            if (sh.get_name(*this) == key) {
+            if (sh.name(*this) == key) {
                 return &sh;
             }
         }
@@ -160,15 +183,15 @@ struct elf {
     template<typename T>
     void print_section_names() {
         for (auto sh: section_headers) {
-            std::cout << sh.get_name(*this) << ", ";
+            std::cout << sh.name(*this) << ", ";
         }
         std::cout << std::endl;
     }
 };
 
 template<typename T>
-std::string_view section_header<T>::get_name(elf& e) const {
-    return std::string_view{reinterpret_cast<char*>(e.section_names.subspan(name).data())};
+std::string_view section_header<T>::name(elf& e) const {
+    return std::string_view{reinterpret_cast<char*>(e.section_names.subspan(name_).data())};
 }
 template<typename T>
 std::span<std::byte> section_header<T>::data(elf& e) const {
