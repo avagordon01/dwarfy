@@ -86,6 +86,8 @@ class elf_header {
     uint16_t shstrndx;
 
     friend class elf;
+    template<typename T>
+    friend class section_header;
     template<typename R>
     friend void read(R& r, elf_header& h);
     void check() {
@@ -148,20 +150,18 @@ class elf {
 
     using T = uint64_t;
 
-public:
     std::span<std::byte> data;
     span_reader reader;
     elf_ident ident;
     elf_header header;
     std::span<program_header<T>> program_headers;
+public:
     std::span<section_header<T>> section_headers;
-    std::span<std::byte> section_names;
     elf(std::span<std::byte> data_):
         data(data_),
         reader(data)
     {
-        read(reader, ident);
-        read(reader, header);
+        reader & ident & header;
 
         assert(header.phentsize == sizeof(program_header<T>));
         program_headers = span_from_bytes<program_header<T>>(data.subspan(header.phoff), header.phnum);
@@ -169,7 +169,6 @@ public:
         assert(header.shentsize == sizeof(section_header<T>));
         section_headers = span_from_bytes<section_header<T>>(data.subspan(header.shoff), header.shnum);
 
-        section_names = section_headers[header.shstrndx].data(*this);
     }
     template<typename T>
     section_header<T>* get_section_by_name(const std::string_view& key) {
@@ -187,11 +186,15 @@ public:
         }
         std::cout << std::endl;
     }
+
+    template<typename T>
+    friend class section_header;
 };
 
 template<typename T>
 std::string_view section_header<T>::name(elf& e) const {
-    return std::string_view{reinterpret_cast<char*>(e.section_names.subspan(name_).data())};
+    std::span<std::byte> section_names = e.section_headers[e.header.shstrndx].data(e);
+    return std::string_view{reinterpret_cast<char*>(section_names.subspan(name_).data())};
 }
 template<typename T>
 std::span<std::byte> section_header<T>::data(elf& e) const {

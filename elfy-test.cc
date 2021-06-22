@@ -20,7 +20,6 @@ void do_stuff(std::span<std::byte> data) {
     } else {
         printf("no debug ranges!\n");
     }
-    printf("%lu program headers\n", e.program_headers.size());
     printf("%lu section headers\n", e.section_headers.size());
 
     //dwarfy::dwarf d{e};
