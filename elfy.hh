@@ -86,7 +86,6 @@ class elf_header {
     uint16_t shstrndx;
 
     friend class elf;
-    template<typename T>
     friend class section_header;
     template<typename R>
     friend void read(R& r, elf_header& h);
@@ -100,104 +99,107 @@ void read(R& r, elf_header& h) {
     r & h.type & h.machine & h.version & h.entry & h.phoff & h.shoff & h.flags & h.ehsize & h.phentsize & h.phnum & h.shentsize & h.shnum & h.shstrndx;
 }
 
-template<typename T>
-class program_header;
-template<>
-class program_header<uint32_t> {
+class program_header {
     uint32_t type;
-    uint32_t offset;
-    uint32_t vaddr;
-    uint32_t paddr;
-    uint32_t filesz;
-    uint32_t memsz;
     uint32_t flags;
-    uint32_t align;
+    input_size_t offset;
+    input_size_t vaddr;
+    input_size_t paddr;
+    input_size_t filesz;
+    input_size_t memsz;
+    input_size_t align;
+
+    template<typename R>
+    friend void read(R& r, program_header& h);
 };
 
-template<>
-class program_header<uint64_t> {
-    uint32_t type;
-    uint32_t flags;
-    uint64_t offset;
-    uint64_t vaddr;
-    uint64_t paddr;
-    uint64_t filesz;
-    uint64_t memsz;
-    uint64_t align;
-};
+template<typename R>
+void read(R& r, program_header& h) {
+    r & h.type;
+    if (r.input_size_t == sizeof(uint64_t)) {
+        r & h.flags;
+    }
+    r & h.offset & h.vaddr & h.paddr & h.filesz & h.memsz;
+    if (r.input_size_t == sizeof(uint32_t)) {
+        r & h.flags;
+    }
+    r & h.align;
+}
 
 class elf;
 
-template<typename T>
 class section_header {
     uint32_t name_;
     uint32_t type;
-    T flags;
-    T addr;
-    T offset;
-    T size;
+    input_size_t flags;
+    input_size_t addr;
+    input_size_t offset;
+    input_size_t size;
     uint32_t link;
     uint32_t info;
-    T addralign;
-    T entsize;
+    input_size_t addralign;
+    input_size_t entsize;
 
 public:
     std::string_view name(elf& e) const;
     std::span<std::byte> data(elf& e) const;
+    template<typename R>
+    friend void read(R& r, section_header& h);
 };
 
+template<typename R>
+void read(R& r, section_header& h) {
+    r & h.name_ & h.type & h.flags & h.addr & h.offset & h.size & h.link & h.info & h.addralign & h.entsize;
+}
+
 class elf {
-
-    using T = uint64_t;
-
     std::span<std::byte> data;
     span_reader reader;
     elf_ident ident;
     elf_header header;
-    std::span<program_header<T>> program_headers;
 public:
-    std::span<section_header<T>> section_headers;
     elf(std::span<std::byte> data_):
         data(data_),
         reader(data)
     {
         reader & ident & header;
-
-        assert(header.phentsize == sizeof(program_header<T>));
-        program_headers = span_from_bytes<program_header<T>>(data.subspan(header.phoff), header.phnum);
-
-        assert(header.shentsize == sizeof(section_header<T>));
-        section_headers = span_from_bytes<section_header<T>>(data.subspan(header.shoff), header.shnum);
-
     }
-    template<typename T>
-    section_header<T>* get_section_by_name(const std::string_view& key) {
-        for (auto& sh: section_headers) {
+    std::optional<program_header> get_program_by_id(size_t id) {
+        if (id >= header.phnum) {
+            return std::nullopt;
+        }
+        program_header ph;
+        reader.reset(data.subspan(header.phoff + header.phentsize * id));
+        reader & ph;
+        return ph;
+    }
+    std::optional<section_header> get_section_by_id(size_t id) {
+        if (id >= header.shnum) {
+            return std::nullopt;
+        }
+        section_header sh;
+        reader.reset(data.subspan(header.shoff + header.shentsize * id));
+        reader & sh;
+        return sh;
+    }
+    std::optional<section_header> get_section_by_name(const std::string_view& key) {
+        for (size_t i = 0; i < header.shnum; i++) {
+            section_header sh = get_section_by_id(i).value();
             if (sh.name(*this) == key) {
-                return &sh;
+                return sh;
             }
         }
-        return nullptr;
-    }
-    template<typename T>
-    void print_section_names() {
-        for (auto sh: section_headers) {
-            std::cout << sh.name(*this) << ", ";
-        }
-        std::cout << std::endl;
+        return std::nullopt;
     }
 
-    template<typename T>
     friend class section_header;
 };
 
-template<typename T>
-std::string_view section_header<T>::name(elf& e) const {
-    std::span<std::byte> section_names = e.section_headers[e.header.shstrndx].data(e);
+std::string_view section_header::name(elf& e) const {
+    std::span<std::byte> section_names = e.get_section_by_id(e.header.shstrndx).value().data(e);
     return std::string_view{reinterpret_cast<char*>(section_names.subspan(name_).data())};
 }
-template<typename T>
-std::span<std::byte> section_header<T>::data(elf& e) const {
+std::span<std::byte> section_header::data(elf& e) const {
     return e.data.subspan(offset, size);
 }
 

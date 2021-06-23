@@ -28,6 +28,10 @@ struct span_reader {
         data(data_)
     {}
 
+    void reset(std::span<std::byte> data_) {
+        data = data_;
+    }
+
     std::span<std::byte> read_bytes(size_t size) {
         auto r = data.first(size);
         data = data.subspan(size);

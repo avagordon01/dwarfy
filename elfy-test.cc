@@ -14,13 +14,18 @@
 
 void do_stuff(std::span<std::byte> data) {
     elfy::elf e{data};
-    e.print_section_names<uint64_t>();
-    if (e.get_section_by_name<uint64_t>(".debug_ranges")) {
-        printf("debug ranges!\n");
+    if (e.get_section_by_name(".debug_info")) {
+        printf("debug info!\n");
     } else {
-        printf("no debug ranges!\n");
+        printf("no debug info!\n");
     }
-    printf("%lu section headers\n", e.section_headers.size());
+    size_t i = 0;
+    std::optional<elfy::section_header> sh;
+    while ((sh = e.get_section_by_id(i++))) {
+        std::cout << sh.value().name(e) << ", ";
+    }
+    std::cout << std::endl;
+    //printf("%lu section headers\n", e.section_headers.size());
 
     //dwarfy::dwarf d{e};
 }
