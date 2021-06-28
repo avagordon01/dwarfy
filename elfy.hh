@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
-#include <cassert>
 #include <optional>
 #include <iostream>
 #include <span>
@@ -13,6 +12,8 @@
 #include <algorithm>
 
 #include "serialise.hh"
+
+using namespace std::literals;
 
 namespace elfy {
 
@@ -27,27 +28,23 @@ class elf_ident {
 
     template<typename R>
     friend void read(R& r, elf_ident& i);
-    void check() {
-        assert(bitwidth_ == 1 || bitwidth_ == 2);
-        assert(endianness_ == 1 || endianness_ == 2);
-        assert(version == 1);
-    }
-    std::endian endianness() {
-        if (endianness_ == 1) {
-            return std::endian::little;
-        } else if (endianness_ == 2) {
-            return std::endian::big;
-        } else {
-            assert(false && "bad ELF endian field");
-        }
-    }
     std::size_t bitwidth() {
         if (bitwidth_ == 1) {
             return sizeof(uint32_t);
         } else if (bitwidth_ == 2) {
             return sizeof(uint64_t);
         } else {
-            assert(false && "bad ELF bitwidth field");
+            throw std::runtime_error("bad ELF bitwidth field, expected 1 or 2 (indicating 32 bit or 64 bit), got: " + std::to_string(bitwidth_));
+        }
+    }
+public:
+    std::endian endianness() {
+        if (endianness_ == 1) {
+            return std::endian::little;
+        } else if (endianness_ == 2) {
+            return std::endian::big;
+        } else {
+            throw std::runtime_error("bad ELF endian field, expected 1 or 2 (indicating little or big endian), got: " + std::to_string(endianness_));
         }
     }
 };
@@ -62,12 +59,15 @@ void read(R& r, elf_ident& i) {
         i.magic[2] == 'L' &&
         i.magic[3] == 'F'
     )) {
-        fprintf(stderr, "not an elf file!\n");
-        abort();
+        throw std::invalid_argument("bad ELF magic number, this is likely not an elf file!");
     }
 
     r.input_size_t = i.bitwidth();
     r.input_endianness = i.endianness();
+
+    if (i.version != 1) {
+        throw std::runtime_error("bad ELF header version field, expected 1, got: " + std::to_string(i.version));
+    }
 }
 
 class elf_header {
@@ -89,14 +89,14 @@ class elf_header {
     friend class section_header;
     template<typename R>
     friend void read(R& r, elf_header& h);
-    void check() {
-        assert(version == 1);
-    }
 };
 
 template<typename R>
 void read(R& r, elf_header& h) {
     r & h.type & h.machine & h.version & h.entry & h.phoff & h.shoff & h.flags & h.ehsize & h.phentsize & h.phnum & h.shentsize & h.shnum & h.shstrndx;
+    if (h.version != 1) {
+        throw std::runtime_error("bad ELF header version field, expected 1, got: " + std::to_string(h.version));
+    }
 }
 
 class program_header {
@@ -155,9 +155,9 @@ void read(R& r, section_header& h) {
 class elf {
     std::span<std::byte> data;
     span_reader reader;
-    elf_ident ident;
     elf_header header;
 public:
+    elf_ident ident;
     elf(std::span<std::byte> data_):
         data(data_),
         reader(data)
@@ -190,6 +190,14 @@ public:
             }
         }
         return std::nullopt;
+    }
+    section_header get_section_by_name_ex(const std::string_view& key) {
+        auto o = get_section_by_name(key);
+        if (o) {
+            return o.value();
+        } else {
+            throw std::runtime_error("no elf section: "s + std::string(key));
+        }
     }
 
     friend class section_header;

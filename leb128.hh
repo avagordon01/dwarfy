@@ -27,7 +27,7 @@ void read(R& r, uleb128& v) {
     size_t i = 0;
     uint8_t byte;
     do {
-        byte = r.read_bytes(1).first();
+        byte = static_cast<uint8_t>(r.read_bytes(1).front());
         result |= (low_bits(byte) << shift);
         shift += 7;
     } while (high_bit(byte) != 0);
@@ -47,7 +47,7 @@ void read(R& r, sleb128& v) {
     size_t i = 0;
     uint8_t byte;
     do {
-        byte = r.read_bytes(1).first();
+        byte = static_cast<uint8_t>(r.read_bytes(1).front());
         result |= (low_bits(byte) << shift);
         shift += 7;
     } while (high_bit(byte) != 0);

@@ -5,16 +5,14 @@
 #include <bit>
 
 template<typename Y>
-Y& from_bytes(std::span<std::byte> bytes) {
+Y from_bytes(std::span<std::byte> bytes) {
     return *std::bit_cast<Y*>(bytes.data());
-    //return *reinterpret_cast<Y*>(bytes.data());
 }
 
 template<typename Y>
 std::span<Y> span_from_bytes(std::span<std::byte> bytes, size_t num = 1) {
     return std::span{
         std::bit_cast<Y*>(bytes.data()),
-        //reinterpret_cast<Y*>(bytes.data()),
         num
     };
 }

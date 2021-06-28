@@ -14,20 +14,17 @@
 
 void do_stuff(std::span<std::byte> data) {
     elfy::elf e{data};
-    if (e.get_section_by_name(".debug_info")) {
-        printf("debug info!\n");
-    } else {
-        printf("no debug info!\n");
-    }
+    if (false) {
     size_t i = 0;
     std::optional<elfy::section_header> sh;
     while ((sh = e.get_section_by_id(i++))) {
         std::cout << sh.value().name(e) << ", ";
     }
     std::cout << std::endl;
-    //printf("%lu section headers\n", e.section_headers.size());
+    }
 
-    //dwarfy::dwarf d{e};
+    dwarfy::dwarf d{e, e.ident.endianness()};
+    std::cout << "all good" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -51,7 +48,14 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        do_stuff(std::span<std::byte>{static_cast<std::byte*>(addr), len});
+        try {
+            printf("processing file '%s':\n", filename);
+            do_stuff(std::span<std::byte>{static_cast<std::byte*>(addr), len});
+        } catch (std::runtime_error &e) {
+            fprintf(stderr, "error processing file '%s': %s\n", filename, e.what());
+        } catch (std::invalid_argument &e) {
+            fprintf(stderr, "error processing file '%s': %s\n", filename, e.what());
+        }
 
         err = munmap(addr, len);
         if (err < 0) {
