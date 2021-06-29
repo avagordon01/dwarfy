@@ -107,16 +107,15 @@ template<typename R>
 void read(R& r, initial_length& i) {
     uint32_t l;
     r & l;
-    if (l == 0xffffffff) {
-        r.input_size_t = 64;
+    if (l == 0xffffffffUL) {
+        r.input_size_t = 8;
         r & i.length;
-        return;
-    }
-    if (l >= 0xfffffff0) {
+    } else if (l < 0xfffffff0UL) {
+        r.input_size_t = 4;
+        i.length = l;
+    } else {
         throw std::runtime_error("bad DWARF initial length field, expected ==0xffffffff or <0xfffffff0, got: " + to_string(l));
     }
-    r.input_size_t = 32;
-    i.length = l;
     //FIXME what about mixed bitwidths in the same file?
 };
 
