@@ -51,13 +51,15 @@ public:
 
 template<typename R>
 void read(R& r, elf_ident& i) {
-    i = from_bytes<elf_ident>(r.read_bytes(sizeof(elf_ident)));
+    std::span<std::byte> magic = r.read_bytes(sizeof(i.magic));
+    r & i.bitwidth_ & i.endianness_ & i.version & i.abi & i.abiversion;
+    r.read_bytes(sizeof(i.padding));
 
     if (!(
-        i.magic[0] == 0x7f &&
-        i.magic[1] == 'E' &&
-        i.magic[2] == 'L' &&
-        i.magic[3] == 'F'
+        magic[0] == std::byte{0x7f} &&
+        magic[1] == std::byte{'E'} &&
+        magic[2] == std::byte{'L'} &&
+        magic[3] == std::byte{'F'}
     )) {
         throw std::invalid_argument("bad ELF magic number, this is likely not an elf file!");
     }

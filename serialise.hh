@@ -4,22 +4,6 @@
 #include <cstddef>
 #include <bit>
 
-template<typename Y>
-Y from_bytes(std::span<std::byte> bytes) {
-    if (bytes.size() != sizeof(Y)) {
-        throw std::runtime_error("internal error! mismatched data sizes in from_bytes!");
-    }
-    return *std::bit_cast<Y*>(bytes.data());
-}
-
-template<typename Y>
-std::span<Y> span_from_bytes(std::span<std::byte> bytes, size_t num = 1) {
-    return std::span{
-        std::bit_cast<Y*>(bytes.data()),
-        num
-    };
-}
-
 struct span_reader {
     std::span<std::byte> data;
     size_t input_size_t;
@@ -46,6 +30,9 @@ T fix_endianness(T value, std::endian input_endianness = std::endian::little) {
     if constexpr (!std::is_scalar_v<T>) {
         return value;
     }
+    if constexpr (sizeof(T) == 1) {
+        return value;
+    }
     if (input_endianness == std::endian::native) {
         return value;
     }
@@ -58,7 +45,8 @@ T fix_endianness(T value, std::endian input_endianness = std::endian::little) {
 template<typename R, typename T>
 requires std::is_scalar_v<T>
 void read(R& r, T& v) {
-    v = fix_endianness(from_bytes<T>(r.read_bytes(sizeof(v))), r.input_endianness);
+    v = *std::bit_cast<T*>(r.read_bytes(sizeof(v)).data());
+    v = fix_endianness(v, r.input_endianness);
 }
 
 struct input_address_size_t {
