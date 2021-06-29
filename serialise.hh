@@ -6,6 +6,9 @@
 
 template<typename Y>
 Y from_bytes(std::span<std::byte> bytes) {
+    if (bytes.size() != sizeof(Y)) {
+        throw std::runtime_error("internal error! mismatched data sizes in from_bytes!");
+    }
     return *std::bit_cast<Y*>(bytes.data());
 }
 
@@ -67,7 +70,17 @@ struct input_address_size_t {
 
 template<typename R>
 void read(R& r, input_address_size_t& x) {
-    x.data = from_bytes<uint64_t>(r.read_bytes(r.input_address_size_t));
+    if (r.input_address_size_t == 4) {
+        uint32_t l;
+        r & l;
+        x.data = l;
+    } else if (r.input_address_size_t == 8) {
+        uint64_t l;
+        r & l;
+        x.data = l;
+    } else {
+        throw std::runtime_error("unsupported (not 32 or 64 bit) bitwidth in file!");
+    }
 }
 
 struct input_size_t {
@@ -79,7 +92,17 @@ struct input_size_t {
 
 template<typename R>
 void read(R& r, input_size_t& x) {
-    x.data = from_bytes<uint64_t>(r.read_bytes(r.input_size_t));
+    if (r.input_size_t == 4) {
+        uint32_t l;
+        r & l;
+        x.data = l;
+    } else if (r.input_size_t == 8) {
+        uint64_t l;
+        r & l;
+        x.data = l;
+    } else {
+        throw std::runtime_error("unsupported (not 32 or 64 bit) bitwidth in file!");
+    }
 }
 
 template<typename T>
