@@ -457,6 +457,29 @@ void dwarf::read_cus() {
     span_reader debug_abbrev_reader {debug_abbrev};
     debug_abbrev_reader.input_endianness = elf.ident.endianness();
 
+    std::vector<size_t> abbrev_vec;
+    while (true) {
+        debug_abbrev_entry dae;
+        std::span<std::byte> start = debug_abbrev_reader.data;
+        debug_abbrev_reader & dae;
+        if (dae.is_last()) {
+            break;
+        }
+
+        while (true) {
+            attribute a;
+            debug_abbrev_reader & a.name & a.form;
+            if (a.is_last()) {
+                break;
+            }
+        }
+
+        size_t offset = start.data() - debug_abbrev.data();
+        abbrev_vec.resize(std::max(abbrev_vec.size(), dae.abbrev_code + 1));
+        abbrev_vec[dae.abbrev_code] = offset;
+        std::cout << "adding abbrev code " << dae.abbrev_code << " offset " << offset << std::endl;
+    }
+
     while (true) {
         compilation_unit_header cu;
         debug_info_reader & cu;
@@ -470,9 +493,10 @@ void dwarf::read_cus() {
             }
             std::cout << "die:" << std::endl;
 
+            size_t offset = abbrev_vec[die.abbrev_code];
             std::cout << "abbrev code = " << die.abbrev_code << std::endl;
-            size_t offset = debug_abbrev_reader.data.data() - debug_abbrev.data();
             std::cout << "abbrev offset = " << offset << std::endl;
+            debug_abbrev_reader.reset(debug_abbrev.subspan(offset));
             debug_abbrev_entry dae;
             debug_abbrev_reader & dae;
 
