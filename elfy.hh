@@ -191,6 +191,14 @@ public:
         }
         return std::nullopt;
     }
+    std::span<std::byte> get_section_data_by_name(const std::string_view& key) {
+        auto o = get_section_by_name(key);
+        if (o) {
+            return o.value().data(*this);
+        } else {
+            return {};
+        }
+    }
     section_header get_section_by_name_ex(const std::string_view& key) {
         auto o = get_section_by_name(key);
         if (o) {

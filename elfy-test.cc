@@ -23,7 +23,7 @@ void do_stuff(std::span<std::byte> data) {
     std::cout << std::endl;
     }
 
-    dwarfy::dwarf d{e, e.ident.endianness()};
+    dwarfy::dwarf d{e};
     std::cout << "all good" << std::endl;
 }
 

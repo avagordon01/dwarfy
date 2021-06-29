@@ -20,6 +20,7 @@ std::span<Y> span_from_bytes(std::span<std::byte> bytes, size_t num = 1) {
 struct span_reader {
     std::span<std::byte> data;
     size_t input_size_t;
+    size_t input_address_size_t;
     std::endian input_endianness;
 
     span_reader(std::span<std::byte> data_):
@@ -55,6 +56,18 @@ template<typename R, typename T>
 requires std::is_scalar_v<T>
 void read(R& r, T& v) {
     v = fix_endianness(from_bytes<T>(r.read_bytes(sizeof(v))), r.input_endianness);
+}
+
+struct input_address_size_t {
+    uint64_t data;
+    operator uint64_t() const {
+        return data;
+    };
+};
+
+template<typename R>
+void read(R& r, input_address_size_t& x) {
+    x.data = from_bytes<uint64_t>(r.read_bytes(r.input_address_size_t));
 }
 
 struct input_size_t {
