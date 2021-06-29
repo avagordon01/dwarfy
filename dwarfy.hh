@@ -8,6 +8,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include <cassert>
+
 #include "elfy.hh"
 #include "leb128.hh"
 #include "serialise.hh"
@@ -101,6 +103,13 @@ enum class dw_children : uint8_t {
 
 struct initial_length {
     uint64_t length;
+    size_t read_bytes;
+    operator uint64_t() {
+        return length;
+    }
+    size_t size() {
+        return read_bytes;
+    }
 };
 
 template<typename R>
@@ -110,9 +119,11 @@ void read(R& r, initial_length& i) {
     if (l == 0xffffffffUL) {
         r.input_size_t = 8;
         r & i.length;
+        i.read_bytes = 12;
     } else if (l < 0xfffffff0UL) {
         r.input_size_t = 4;
         i.length = l;
+        i.read_bytes = 4;
     } else {
         throw std::runtime_error("bad DWARF initial length field, expected ==0xffffffff or <0xfffffff0, got: " + to_string(l));
     }
@@ -301,13 +312,13 @@ std::string to_string(attribute attr) {
 
 struct debugging_information_entry {
     uleb128 abbrev_code;
+    bool is_last() {
+        return abbrev_code == 0;
+    }
 };
 template<typename R>
 void read(R &r, debugging_information_entry& die) {
     r & die.abbrev_code;
-    if (die.abbrev_code == 0) {
-        return;
-    }
 }
 
 struct type_unit_header {
@@ -434,32 +445,56 @@ struct dwarf {
         debug_framesection(elf.get_section_data_by_name(".debug_framesection")),
         debug_cu_index(elf.get_section_data_by_name(".debug_cu_index")),
         debug_tu_index(elf.get_section_data_by_name(".debug_tu_index"))
-    {
-        span_reader debug_info_reader {debug_info};
-        debug_info_reader.input_endianness = elf.ident.endianness();
-        span_reader debug_abbrev_reader {debug_abbrev};
-        debug_abbrev_reader.input_endianness = elf.ident.endianness();
+    {}
 
+    void read_cus();
+};
+
+void dwarf::read_cus() {
+    std::cout << to_string(debug_info) << std::endl;
+    span_reader debug_info_reader {debug_info};
+    debug_info_reader.input_endianness = elf.ident.endianness();
+    span_reader debug_abbrev_reader {debug_abbrev};
+    debug_abbrev_reader.input_endianness = elf.ident.endianness();
+
+    while (true) {
         compilation_unit_header cu;
         debug_info_reader & cu;
+        std::cout << "cu:" << std::endl;
 
-        debugging_information_entry die;
-        debug_info_reader & die;
-
-        debug_abbrev_entry dae;
-        debug_abbrev_reader & dae;
         while (true) {
-            attribute attr;
-            read(debug_info_reader, debug_abbrev_reader, attr);
-            if (!attr.is_last()) {
-                fprintf(stderr, "got an attr! %s\n", to_string(attr).c_str());
-            } else {
+            debugging_information_entry die;
+            debug_info_reader & die;
+            if (die.is_last()) {
                 break;
             }
+            std::cout << "die:" << std::endl;
+
+            std::cout << "abbrev code = " << die.abbrev_code << std::endl;
+            size_t offset = debug_abbrev_reader.data.data() - debug_abbrev.data();
+            std::cout << "abbrev offset = " << offset << std::endl;
+            debug_abbrev_entry dae;
+            debug_abbrev_reader & dae;
+
+            std::cout << to_string(dae.tag) << std::endl;
+
+            assert(die.abbrev_code == dae.abbrev_code);
+
+            while (true) {
+                attribute attr;
+                read(debug_info_reader, debug_abbrev_reader, attr);
+                if (!attr.is_last()) {
+                    std::cout << to_string(attr) << std::endl;
+                } else {
+                    break;
+                }
+            }
+            std::cout << std::endl;
         }
 
-        return;
+        assert(debug_info.data() + static_cast<uint64_t>(cu.unit_length) + cu.unit_length.size() ==
+                debug_info_reader.data.data());
     }
-};
+}
 
 }

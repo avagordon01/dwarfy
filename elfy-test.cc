@@ -24,6 +24,7 @@ void do_stuff(std::span<std::byte> data) {
     }
 
     dwarfy::dwarf d{e};
+    d.read_cus();
     std::cout << "all good" << std::endl;
 }
 
