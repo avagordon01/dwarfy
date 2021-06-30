@@ -490,7 +490,7 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
             throw std::runtime_error("no abbrev code found for die");
         }
         if (dae.abbrev_code == abbrev_code) {
-            break;
+            return offset;
         }
         while (true) {
             attribute a;
@@ -500,7 +500,6 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
             }
         }
     }
-    return offset;
 }
 
 void dwarf::read_cus() {
@@ -512,6 +511,7 @@ void dwarf::read_cus() {
 
     while (true) {
         compilation_unit_header cu;
+        std::byte* cu_start = debug_info_reader.data.data();
         debug_info_reader & cu;
         std::cout << "cu:" << std::endl;
 
@@ -530,8 +530,6 @@ void dwarf::read_cus() {
 
             std::cout << to_string(dae.tag) << std::endl;
 
-            assert(die.abbrev_code == dae.abbrev_code);
-
             while (true) {
                 attribute attr;
                 read(debug_info_reader, debug_abbrev_reader, attr);
@@ -544,12 +542,14 @@ void dwarf::read_cus() {
             std::cout << std::endl;
         }
 
+        std::byte* cu_end = debug_info_reader.data.data();
+        if (cu_start + static_cast<uint64_t>(cu.unit_length) + cu.unit_length.size() != cu_end) {
+            throw std::runtime_error("internal error! unit_length doesn't match number of bytes read!");
+        }
+
         if (debug_info_reader.data.empty()) {
             break;
         }
-
-        assert(debug_info.data() + static_cast<uint64_t>(cu.unit_length) + cu.unit_length.size() ==
-                debug_info_reader.data.data());
     }
 }
 
