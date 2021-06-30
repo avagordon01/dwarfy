@@ -28,8 +28,11 @@ void read(R& r, uleb128& v) {
     uint8_t byte;
     do {
         byte = static_cast<uint8_t>(r.read_bytes(1).front());
-        result |= (low_bits(byte) << shift);
+        result |= (static_cast<uint64_t>(low_bits(byte)) << shift);
         shift += 7;
+        if (shift >= std::numeric_limits<decltype(result)>::digits) {
+            throw std::runtime_error("error in decoding uleb128 value, shift is larger than 64 bit value");
+        }
     } while (high_bit(byte) != 0);
     v.data = result;
 };
@@ -48,11 +51,14 @@ void read(R& r, sleb128& v) {
     uint8_t byte;
     do {
         byte = static_cast<uint8_t>(r.read_bytes(1).front());
-        result |= (low_bits(byte) << shift);
+        result |= (static_cast<uint64_t>(low_bits(byte)) << shift);
         shift += 7;
+        if (shift >= std::numeric_limits<decltype(result)>::digits) {
+            throw std::runtime_error("error in decoding uleb128 value, shift is larger than 64 bit value");
+        }
     } while (high_bit(byte) != 0);
     if (shift < size && sign_bit(byte)) {
-        result |= -(1 << shift);
+        result |= -(1ull << shift);
     }
     v.data = result;
 };
