@@ -64,8 +64,8 @@ void read(R& r, elf_ident& i) {
         throw std::invalid_argument("bad ELF magic number, this is likely not an elf file!");
     }
 
-    r.input_size_t = i.bitwidth();
-    r.input_endianness = i.endianness();
+    r.file_offset_size = i.bitwidth();
+    r.file_endianness = i.endianness();
 
     if (i.version != 1) {
         throw std::runtime_error("bad ELF header version field, expected 1, got: " + std::to_string(i.version));
@@ -76,9 +76,9 @@ class elf_header {
     uint16_t type;
     uint16_t machine;
     uint32_t version;
-    input_size_t entry;
-    input_size_t phoff;
-    input_size_t shoff;
+    file_offset_size entry;
+    file_offset_size phoff;
+    file_offset_size shoff;
     uint32_t flags;
     uint16_t ehsize;
     uint16_t phentsize;
@@ -104,12 +104,12 @@ void read(R& r, elf_header& h) {
 class program_header {
     uint32_t type;
     uint32_t flags;
-    input_size_t offset;
-    input_size_t vaddr;
-    input_size_t paddr;
-    input_size_t filesz;
-    input_size_t memsz;
-    input_size_t align;
+    file_offset_size offset;
+    file_offset_size vaddr;
+    file_offset_size paddr;
+    file_offset_size filesz;
+    file_offset_size memsz;
+    file_offset_size align;
 
     template<typename R>
     friend void read(R& r, program_header& h);
@@ -118,11 +118,11 @@ class program_header {
 template<typename R>
 void read(R& r, program_header& h) {
     r & h.type;
-    if (r.input_size_t == sizeof(uint64_t)) {
+    if (r.file_offset_size == sizeof(uint64_t)) {
         r & h.flags;
     }
     r & h.offset & h.vaddr & h.paddr & h.filesz & h.memsz;
-    if (r.input_size_t == sizeof(uint32_t)) {
+    if (r.file_offset_size == sizeof(uint32_t)) {
         r & h.flags;
     }
     r & h.align;
@@ -133,14 +133,14 @@ class elf;
 class section_header {
     uint32_t name_;
     uint32_t type;
-    input_size_t flags;
-    input_size_t addr;
-    input_size_t offset;
-    input_size_t size;
+    file_offset_size flags;
+    file_offset_size addr;
+    file_offset_size offset;
+    file_offset_size size;
     uint32_t link;
     uint32_t info;
-    input_size_t addralign;
-    input_size_t entsize;
+    file_offset_size addralign;
+    file_offset_size entsize;
 
 public:
     std::string_view name(elf& e) const;

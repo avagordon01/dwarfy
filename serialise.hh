@@ -6,9 +6,10 @@
 
 struct span_reader {
     std::span<std::byte> data;
-    size_t input_size_t;
-    size_t input_address_size_t;
-    std::endian input_endianness;
+    size_t file_offset_size;
+    size_t machine_address_size;
+    //XXX ELF doesn't distinguish between file bitwidth and machine bitwidth, but DWARF does
+    std::endian file_endianness;
 
     span_reader(std::span<std::byte> data_):
         data(data_)
@@ -26,14 +27,14 @@ struct span_reader {
 };
 
 template<typename T>
-T fix_endianness(T value, std::endian input_endianness = std::endian::little) {
+T fix_endianness(T value, std::endian file_endianness = std::endian::little) {
     if constexpr (!std::is_scalar_v<T>) {
         return value;
     }
     if constexpr (sizeof(T) == 1) {
         return value;
     }
-    if (input_endianness == std::endian::native) {
+    if (file_endianness == std::endian::native) {
         return value;
     }
     using A = std::array<std::byte, sizeof(T)>;
@@ -46,10 +47,10 @@ template<typename R, typename T>
 requires std::is_scalar_v<T>
 void read(R& r, T& v) {
     v = *std::bit_cast<T*>(r.read_bytes(sizeof(v)).data());
-    v = fix_endianness(v, r.input_endianness);
+    v = fix_endianness(v, r.file_endianness);
 }
 
-struct input_address_size_t {
+struct machine_address_size {
     uint64_t data;
     operator uint64_t() const {
         return data;
@@ -57,12 +58,12 @@ struct input_address_size_t {
 };
 
 template<typename R>
-void read(R& r, input_address_size_t& x) {
-    if (r.input_address_size_t == 4) {
+void read(R& r, machine_address_size& x) {
+    if (r.machine_address_size == 4) {
         uint32_t l;
         r & l;
         x.data = l;
-    } else if (r.input_address_size_t == 8) {
+    } else if (r.machine_address_size == 8) {
         uint64_t l;
         r & l;
         x.data = l;
@@ -71,7 +72,7 @@ void read(R& r, input_address_size_t& x) {
     }
 }
 
-struct input_size_t {
+struct file_offset_size {
     uint64_t data;
     operator uint64_t() const {
         return data;
@@ -79,12 +80,12 @@ struct input_size_t {
 };
 
 template<typename R>
-void read(R& r, input_size_t& x) {
-    if (r.input_size_t == 4) {
+void read(R& r, file_offset_size& x) {
+    if (r.file_offset_size == 4) {
         uint32_t l;
         r & l;
         x.data = l;
-    } else if (r.input_size_t == 8) {
+    } else if (r.file_offset_size == 8) {
         uint64_t l;
         r & l;
         x.data = l;

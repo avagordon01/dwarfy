@@ -115,11 +115,11 @@ void read(R& r, initial_length& i) {
     uint32_t l;
     r & l;
     if (l == 0xffffffffUL) {
-        r.input_size_t = 8;
+        r.file_offset_size = 8;
         r & i.length;
         i.read_bytes = 12;
     } else if (l < 0xfffffff0UL) {
-        r.input_size_t = 4;
+        r.file_offset_size = 4;
         i.length = l;
         i.read_bytes = 4;
     } else {
@@ -147,7 +147,7 @@ std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
     switch (form) {
         case dw_form::addr:
             {
-                input_address_size_t offset;
+                machine_address_size offset;
                 ir & offset;
                 return {};//TODO ???
             }
@@ -215,7 +215,7 @@ std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
             }
         case dw_form::strp:
             {
-                input_size_t offset;
+                file_offset_size offset;
                 ir & offset;
                 return {};
 
@@ -239,7 +239,7 @@ std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
             }
         case dw_form::ref_addr:
             {
-                input_size_t offset;
+                file_offset_size offset;
                 ir & offset;
                 return {};//TODO {debug_info.offset() + offset};
             }
@@ -282,7 +282,7 @@ std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
             }
         case dw_form::sec_offset:
             {
-                input_size_t offset;
+                file_offset_size offset;
                 ir & offset;
                 return {};//TODO {section.offset() + offset};
             }
@@ -322,16 +322,16 @@ void read(R &r, debugging_information_entry& die) {
 struct type_unit_header {
     initial_length unit_length;
     uint16_t version;
-    input_size_t debug_abbrev_offset;
+    file_offset_size debug_abbrev_offset;
     uint8_t address_size;
     uint64_t type_signature;
-    input_size_t type_offset;
+    file_offset_size type_offset;
 };
 
 template<typename R>
 void read(R &r, type_unit_header& tu) {
     r & tu.unit_length & tu.version & tu.debug_abbrev_offset & tu.address_size & tu.type_signature & tu.type_offset;
-    r.input_address_size_t = tu.address_size;
+    r.machine_address_size = tu.address_size;
     if (tu.version < 2 || tu.version > 5) {
         throw std::runtime_error("unsupported DWARF version, expected 2 <= version <= 5, got: " + to_string(tu.version));
     }
@@ -340,13 +340,13 @@ void read(R &r, type_unit_header& tu) {
 struct compilation_unit_header {
     initial_length unit_length;
     uint16_t version;
-    input_size_t debug_abbrev_offset;
+    file_offset_size debug_abbrev_offset;
     uint8_t address_size;
 };
 template<typename R>
 void read(R &r, compilation_unit_header& cu) {
     r & cu.unit_length & cu.version & cu.debug_abbrev_offset & cu.address_size;
-    r.input_address_size_t = cu.address_size;
+    r.machine_address_size = cu.address_size;
     if (cu.version < 2 || cu.version > 5) {
         throw std::runtime_error("unsupported DWARF version, expected 2 <= version <= 5, got: " + to_string(cu.version));
     }
@@ -458,7 +458,7 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code) {
 
     if (abbrev_vec.empty()) {
         span_reader debug_abbrev_reader {debug_abbrev};
-        debug_abbrev_reader.input_endianness = elf.ident.endianness();
+        debug_abbrev_reader.file_endianness = elf.ident.endianness();
         while (true) {
             debug_abbrev_entry dae;
             std::span<std::byte> start = debug_abbrev_reader.data;
@@ -497,7 +497,7 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code) {
 size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
     size_t offset = cu.debug_abbrev_offset;
     span_reader debug_abbrev_reader {debug_abbrev.subspan(offset)};
-    debug_abbrev_reader.input_endianness = elf.ident.endianness();
+    debug_abbrev_reader.file_endianness = elf.ident.endianness();
     debug_abbrev_entry dae;
     while (true) {
         offset = debug_abbrev_reader.data.data() - debug_abbrev.data();
@@ -522,9 +522,9 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
 void dwarf::read_cus() {
     std::cout << to_string(debug_info) << std::endl;
     span_reader debug_info_reader {debug_info};
-    debug_info_reader.input_endianness = elf.ident.endianness();
+    debug_info_reader.file_endianness = elf.ident.endianness();
     span_reader debug_abbrev_reader {debug_abbrev};
-    debug_abbrev_reader.input_endianness = elf.ident.endianness();
+    debug_abbrev_reader.file_endianness = elf.ident.endianness();
 
     while (true) {
         compilation_unit_header cu;
@@ -540,7 +540,7 @@ void dwarf::read_cus() {
             }
             std::cout << "die:" << std::endl;
 
-            size_t offset = find_abbrev(die.abbrev_code);
+            size_t offset = find_abbrev(die.abbrev_code, cu);
             debug_abbrev_reader.reset(debug_abbrev.subspan(offset));
             debug_abbrev_entry dae;
             debug_abbrev_reader & dae;
