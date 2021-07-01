@@ -8,8 +8,6 @@
 #include <sstream>
 #include <iomanip>
 
-#include <cassert>
-
 #include "elfy.hh"
 #include "leb128.hh"
 #include "serialise.hh"
@@ -364,7 +362,10 @@ struct debug_abbrev_entry {
 };
 template<typename R>
 void read(R &r, debug_abbrev_entry& dae) {
-    r & dae.abbrev_code & dae.tag & dae.debug_info_sibling;
+    r & dae.abbrev_code;
+    if (!dae.is_last()) {
+        r & dae.tag & dae.debug_info_sibling;
+    }
 }
 
 std::span<std::byte> tmp(elfy::elf& elf, std::optional<elfy::section_header> sh) {
@@ -448,33 +449,48 @@ struct dwarf {
     {}
 
     void read_cus();
-    void find_abbrev(uleb128 abbrev_code);
+    size_t find_abbrev(uleb128 abbrev_code);
     size_t find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu);
 };
 
-void dwarf::find_abbrev(uleb128 abbrev_code) {
-    std::vector<size_t> abbrev_vec;
-    span_reader debug_abbrev_reader {debug_abbrev};
-    debug_abbrev_reader.input_endianness = elf.ident.endianness();
-    while (true) {
-        debug_abbrev_entry dae;
-        std::span<std::byte> start = debug_abbrev_reader.data;
-        debug_abbrev_reader & dae;
-        if (dae.is_last()) {
-            break;
-        }
+size_t dwarf::find_abbrev(uleb128 abbrev_code) {
+    static std::vector<size_t> abbrev_vec;
 
+    if (abbrev_vec.empty()) {
+        span_reader debug_abbrev_reader {debug_abbrev};
+        debug_abbrev_reader.input_endianness = elf.ident.endianness();
         while (true) {
-            attribute a;
-            debug_abbrev_reader & a.name & a.form;
-            if (a.is_last()) {
+            debug_abbrev_entry dae;
+            std::span<std::byte> start = debug_abbrev_reader.data;
+            std::cout << "reading dae at offset " << start.data() - debug_abbrev.data() << std::endl;
+            debug_abbrev_reader & dae;
+            if (dae.is_last()) {
+                continue;
+            }
+
+            while (true) {
+                attribute a;
+                debug_abbrev_reader & a.name & a.form;
+                if (a.is_last()) {
+                    break;
+                }
+            }
+
+            size_t offset = start.data() - debug_abbrev.data();
+            abbrev_vec.resize(std::max(abbrev_vec.size(), dae.abbrev_code + 1));
+            abbrev_vec[dae.abbrev_code] = offset;
+
+            //FIXME
+            //seems to run off the end of real DAEs but still has data in the section
+            if (debug_abbrev_reader.data.empty()) {
                 break;
             }
         }
-
-        size_t offset = start.data() - debug_abbrev.data();
-        abbrev_vec.resize(std::max(abbrev_vec.size(), dae.abbrev_code + 1));
-        abbrev_vec[dae.abbrev_code] = offset;
+    }
+    if (abbrev_code < abbrev_vec.size()) {
+        return abbrev_vec[abbrev_code];
+    } else {
+        throw std::runtime_error("no abbrev code found for die");
     }
 }
 
@@ -485,6 +501,7 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
     debug_abbrev_entry dae;
     while (true) {
         offset = debug_abbrev_reader.data.data() - debug_abbrev.data();
+        std::cout << "reading dae at offset " << offset << std::endl;
         debug_abbrev_reader & dae;
         if (dae.is_last()) {
             throw std::runtime_error("no abbrev code found for die");
@@ -523,7 +540,7 @@ void dwarf::read_cus() {
             }
             std::cout << "die:" << std::endl;
 
-            size_t offset = find_abbrev(die.abbrev_code, cu);
+            size_t offset = find_abbrev(die.abbrev_code);
             debug_abbrev_reader.reset(debug_abbrev.subspan(offset));
             debug_abbrev_entry dae;
             debug_abbrev_reader & dae;
