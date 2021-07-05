@@ -57,6 +57,8 @@ std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form);
 void read(span_reader &ir, span_reader &ar, attribute& a);
 std::string to_string(attribute attr);
 
+struct dwarf;
+
 struct debugging_information_entry {
     uleb128 abbrev_code;
     bool is_last();
@@ -65,6 +67,7 @@ struct debugging_information_entry {
     class iterator;
 };
 class debugging_information_entry::iterator {
+    dwarf* d;
     span_reader debug_info_reader;
     span_reader debug_abbrev_reader;
     debugging_information_entry die;
@@ -77,7 +80,7 @@ public:
     bool operator==(sentinel);
     sentinel end() const;
     iterator();
-    iterator(std::span<std::byte> debug_info, std::span<std::byte> debug_abbrev, std::endian initial_endianness);
+    iterator(dwarf* d_);
     const debugging_information_entry operator*() const;
     iterator& operator++();
     iterator operator++(int);
@@ -102,12 +105,14 @@ struct compilation_unit_header {
     uint16_t version;
     file_offset_size debug_abbrev_offset;
     uint8_t address_size;
+    dwarf* d;
 
     class sentinel {};
     class iterator;
 };
 
 class compilation_unit_header::iterator {
+    dwarf* d;
     span_reader debug_info_reader;
     std::span<std::byte> next_cu;
     compilation_unit_header cu;
@@ -120,7 +125,7 @@ public:
     bool operator==(sentinel);
     sentinel end() const;
     iterator();
-    iterator(std::span<std::byte> debug_info, std::endian initial_endianness);
+    iterator(dwarf* d_);
     const compilation_unit_header operator*() const;
     iterator& operator++();
     iterator operator++(int);
@@ -128,6 +133,7 @@ public:
     debugging_information_entry::iterator die_iter();
     iterator begin() const;
 };
+static_assert(std::input_iterator<compilation_unit_header::iterator>);
 void read(span_reader &r, compilation_unit_header& cu);
 
 struct debug_abbrev_entry {

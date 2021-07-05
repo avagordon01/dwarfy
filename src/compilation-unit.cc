@@ -9,14 +9,16 @@ compilation_unit_header::sentinel compilation_unit_header::iterator::end() const
     return compilation_unit_header::sentinel{};
 }
 compilation_unit_header::iterator::iterator():
+    d(nullptr),
     debug_info_reader({})
 {}
-compilation_unit_header::iterator::iterator(std::span<std::byte> debug_info, std::endian initial_endianness):
-    debug_info_reader(debug_info)
+compilation_unit_header::iterator::iterator(dwarf* d_):
+    d(d_),
+    debug_info_reader(d->debug_info)
 {
-    debug_info_reader.file_endianness = initial_endianness;
+    debug_info_reader.file_endianness = d->initial_endianness;
     debug_info_reader & cu;
-    next_cu = debug_info.subspan(cu.unit_length + cu.unit_length.size());
+    next_cu = d->debug_info.subspan(cu.unit_length + cu.unit_length.size());
 }
 const compilation_unit_header compilation_unit_header::iterator::operator*() const {
     return cu;
@@ -38,17 +40,11 @@ span_reader compilation_unit_header::iterator::die_reader() {
     return debug_info_reader;
 }
 debugging_information_entry::iterator compilation_unit_header::iterator::die_iter() {
-    std::span<std::byte> debug_info;
-    return debugging_information_entry::iterator{
-        debug_info,
-        debug_info,
-        debug_info_reader.file_endianness
-    };
+    return debugging_information_entry::iterator{d};
 }
 
 compilation_unit_header::iterator compilation_unit_header::iterator::begin() const {
     return *this;
 }
-static_assert(std::input_iterator<compilation_unit_header::iterator>);
 
 }

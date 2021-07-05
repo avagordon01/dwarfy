@@ -75,7 +75,7 @@ void read(span_reader& r, initial_length& i) {
 };
 
 compilation_unit_header::iterator dwarf::cu_iter() {
-    return compilation_unit_header::iterator{debug_info, initial_endianness};
+    return compilation_unit_header::iterator{this};
 }
 
 size_t dwarf::find_abbrev(uleb128 abbrev_code) {
@@ -156,6 +156,8 @@ void dwarf::read_debug_info() {
         std::cout << "offset " << debug_info_reader.data.data() - debug_info.data() << std::endl;
 
         while (true) {
+            //TODO
+            //cu_it.die_iter();
             debugging_information_entry die;
             debug_info_reader & die;
             if (die.is_last()) {
