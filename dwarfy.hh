@@ -220,7 +220,7 @@ std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
                 return {};
 
                 //TODO
-                std::span<std::byte> string = {};//elf.get_section_by_name(".debug_str");
+                std::span<std::byte> string = {};//debug_str;
                 string = string.subspan(offset);
                 size_t i;
                 for (i = 0; i < string.size(); i++) {
@@ -342,7 +342,61 @@ struct compilation_unit_header {
     uint16_t version;
     file_offset_size debug_abbrev_offset;
     uint8_t address_size;
+
+    class sentinel {};
+    class iterator;
 };
+class compilation_unit_header::iterator {
+    span_reader debug_info_reader;
+    std::span<std::byte> next_cu;
+    compilation_unit_header cu;
+public:
+    using iterator_concept  = std::input_iterator_tag;
+    using difference_type   = std::ptrdiff_t;
+    using value_type        = compilation_unit_header;
+    using pointer           = value_type*;
+    using reference         = value_type&;
+    bool operator==(sentinel) {
+        return debug_info_reader.data.empty();
+    }
+    sentinel end() const {
+        return sentinel{};
+    }
+    iterator():
+        debug_info_reader({})
+    {}
+    iterator(std::span<std::byte> debug_info, std::endian initial_endianness):
+        debug_info_reader(debug_info)
+    {
+        debug_info_reader.file_endianness = initial_endianness;
+        debug_info_reader & cu;
+        next_cu = debug_info.subspan(cu.unit_length + cu.unit_length.size());
+    }
+    const compilation_unit_header operator*() const {
+        return cu;
+    }
+    iterator& operator++() {
+        debug_info_reader.data = next_cu;
+        if (*this != end()) {
+            debug_info_reader & cu;
+            next_cu = next_cu.subspan(cu.unit_length + cu.unit_length.size());
+        }
+        return *this;
+    }
+    iterator operator++(int) {
+        iterator ret = *this;
+        this->operator++();
+        return ret;
+    }
+    span_reader die_reader() {
+        return debug_info_reader;
+    }
+
+    iterator begin() const {
+        return *this;
+    }
+};
+static_assert(std::input_iterator<compilation_unit_header::iterator>);
 template<typename R>
 void read(R &r, compilation_unit_header& cu) {
     r & cu.unit_length & cu.version & cu.debug_abbrev_offset & cu.address_size;
@@ -365,14 +419,6 @@ void read(R &r, debug_abbrev_entry& dae) {
     r & dae.abbrev_code;
     if (!dae.is_last()) {
         r & dae.tag & dae.debug_info_sibling;
-    }
-}
-
-std::span<std::byte> tmp(elfy::elf& elf, std::optional<elfy::section_header> sh) {
-    if (sh) {
-        return sh->data(elf);
-    } else {
-        return {};
     }
 }
 
@@ -412,6 +458,8 @@ struct dwarf {
     std::span<std::byte> debug_cu_index;
     std::span<std::byte> debug_tu_index;
 
+    std::endian initial_endianness;
+
     dwarf(elfy::elf& elf_):
         elf(elf_),
 
@@ -445,12 +493,18 @@ struct dwarf {
         debug_str_offsets_dwo(elf.get_section_data_by_name(".debug_str_offsets.dwo")),
         debug_framesection(elf.get_section_data_by_name(".debug_framesection")),
         debug_cu_index(elf.get_section_data_by_name(".debug_cu_index")),
-        debug_tu_index(elf.get_section_data_by_name(".debug_tu_index"))
+        debug_tu_index(elf.get_section_data_by_name(".debug_tu_index")),
+
+        initial_endianness(elf.ident.endianness())
     {}
 
-    void read_cus();
+    void read_debug_info();
     size_t find_abbrev(uleb128 abbrev_code);
     size_t find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu);
+
+    compilation_unit_header::iterator cu_iter() {
+        return compilation_unit_header::iterator{debug_info, initial_endianness};
+    }
 };
 
 size_t dwarf::find_abbrev(uleb128 abbrev_code) {
@@ -458,7 +512,7 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code) {
 
     if (abbrev_vec.empty()) {
         span_reader debug_abbrev_reader {debug_abbrev};
-        debug_abbrev_reader.file_endianness = elf.ident.endianness();
+        debug_abbrev_reader.file_endianness = initial_endianness;
         while (true) {
             debug_abbrev_entry dae;
             std::span<std::byte> start = debug_abbrev_reader.data;
@@ -497,7 +551,7 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code) {
 size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
     size_t offset = cu.debug_abbrev_offset;
     span_reader debug_abbrev_reader {debug_abbrev.subspan(offset)};
-    debug_abbrev_reader.file_endianness = elf.ident.endianness();
+    debug_abbrev_reader.file_endianness = initial_endianness;
     debug_abbrev_entry dae;
     while (true) {
         offset = debug_abbrev_reader.data.data() - debug_abbrev.data();
@@ -519,18 +573,16 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
     }
 }
 
-void dwarf::read_cus() {
+void dwarf::read_debug_info() {
     std::cout << to_string(debug_info) << std::endl;
-    span_reader debug_info_reader {debug_info};
-    debug_info_reader.file_endianness = elf.ident.endianness();
     span_reader debug_abbrev_reader {debug_abbrev};
-    debug_abbrev_reader.file_endianness = elf.ident.endianness();
+    debug_abbrev_reader.file_endianness = initial_endianness;
 
-    while (true) {
-        compilation_unit_header cu;
-        std::byte* cu_start = debug_info_reader.data.data();
-        debug_info_reader & cu;
+    auto cu_it = cu_iter();
+    for (compilation_unit_header cu: cu_it) {
         std::cout << "cu:" << std::endl;
+        span_reader debug_info_reader = cu_it.die_reader();
+        std::cout << "offset " << debug_info_reader.data.data() - debug_info.data() << std::endl;
 
         while (true) {
             debugging_information_entry die;
@@ -557,15 +609,6 @@ void dwarf::read_cus() {
                 }
             }
             std::cout << std::endl;
-        }
-
-        std::byte* cu_end = debug_info_reader.data.data();
-        if (cu_start + static_cast<uint64_t>(cu.unit_length) + cu.unit_length.size() != cu_end) {
-            throw std::runtime_error("internal error! unit_length doesn't match number of bytes read!");
-        }
-
-        if (debug_info_reader.data.empty()) {
-            break;
         }
     }
 }
