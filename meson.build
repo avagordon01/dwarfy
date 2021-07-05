@@ -25,6 +25,27 @@ expected_dep = declare_dependency(
   ]
 )
 
+dwarfy_lib = static_library('dwarfy',
+  'src/elf.cc',
+  'src/dwarf.cc',
+  'src/enums.cc',
+  'src/compilation-unit.cc',
+  'src/debugging-information-entry.cc',
+  'src/leb128.cc',
+  include_directories: [
+    'include',
+  ],
+  install: true,
+)
+dwarfy_dep = declare_dependency(
+  include_directories: [
+    'include',
+  ],
+  link_with: [
+    dwarfy_lib
+  ],
+)
+
 executable(
   'elfy-test',
   [
@@ -32,6 +53,7 @@ executable(
   ],
   dependencies: [
     expected_dep,
+    dwarfy_dep,
   ],
   install: true,
 )

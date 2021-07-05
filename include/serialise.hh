@@ -3,6 +3,7 @@
 #include <span>
 #include <cstddef>
 #include <bit>
+#include <algorithm>
 
 struct span_reader {
     std::span<std::byte> data;

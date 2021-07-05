@@ -1,67 +1,187 @@
-enum class dw_tag {
-    array_type = 0x01,
-    class_type = 0x02,
-    entry_point = 0x03,
-    enumeration_type = 0x04,
-    formal_parameter = 0x05,
-    imported_declaration = 0x08,
-    label = 0x0a,
-    lexical_block = 0x0b,
-    member = 0x0d,
-    pointer_type = 0x0f,
-    reference_type = 0x10,
-    compile_unit = 0x11,
-    string_type = 0x12,
-    structure_type = 0x13,
-    subroutine_type = 0x15,
-    typedef_ = 0x16,
-    union_type = 0x17,
-    unspecified_parameters = 0x18,
-    variant = 0x19,
-    common_block = 0x1a,
-    common_inclusion = 0x1b,
-    inheritance = 0x1c,
-    inlined_subroutine = 0x1d,
-    module = 0x1e,
-    ptr_to_member_type = 0x1f,
-    set_type = 0x20,
-    subrange_type = 0x21,
-    with_stmt = 0x22,
-    access_declaration = 0x23,
-    base_type = 0x24,
-    catch_block = 0x25,
-    const_type = 0x26,
-    constant = 0x27,
-    enumerator = 0x28,
-    file_type = 0x29,
-    friend_ = 0x2a,
-    namelist = 0x2b,
-    namelist_item = 0x2c,
-    packed_type = 0x2d,
-    subprogram = 0x2e,
-    template_type_parameter = 0x2f,
-    template_value_parameter = 0x30,
-    thrown_type = 0x31,
-    try_block = 0x32,
-    variant_part = 0x33,
-    variable = 0x34,
-    volatile_type = 0x35,
-    dwarf_procedure = 0x36,
-    restrict_type = 0x37,
-    interface_type = 0x38,
-    namespace_ = 0x39,
-    imported_module = 0x3a,
-    unspecified_type = 0x3b,
-    partial_unit = 0x3c,
-    imported_unit = 0x3d,
-    condition = 0x3f,
-    shared_type = 0x40,
-    type_unit = 0x41,
-    rvalue_reference_type = 0x42,
-    template_alias = 0x43,
-    lo_user = 0x4080,
-    hi_user = 0xffff,
-};
+#include "enums.hh"
+#include "serialise.hh"
+#include "leb128.hh"
+#include <unordered_map>
+
+namespace dwarfy {
+
+void read(span_reader &r, enum dw_tag& tag) {
+    uleb128 v;
+    r & v;
+    tag = static_cast<dw_tag>(static_cast<uint64_t>(v));
+}
+void read(span_reader &r, enum dw_at& attr) {
+    uleb128 v;
+    r & v;
+    attr = static_cast<dw_at>(static_cast<uint64_t>(v));
+}
+void read(span_reader &r, enum dw_form& form) {
+    uleb128 v;
+    r & v;
+    form = static_cast<dw_form>(static_cast<uint64_t>(v));
+}
+std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
+    switch (form) {
+        case dw_form::addr:
+            {
+                machine_address_size offset;
+                ir & offset;
+                return {};//TODO ???
+            }
+        case dw_form::block2:
+            {
+                uint16_t l;
+                ir & l;
+                return ir.read_bytes(l);
+            }
+        case dw_form::block4:
+            {
+                uint32_t l;
+                ir & l;
+                return ir.read_bytes(l);
+            }
+        case dw_form::data2:
+            {
+                return ir.read_bytes(2);
+            }
+        case dw_form::data4:
+            {
+                return ir.read_bytes(4);
+            }
+        case dw_form::data8:
+            {
+                return ir.read_bytes(8);
+            }
+        case dw_form::string:
+            {
+                size_t i;
+                for (i = 0; i < ir.data.size(); i++) {
+                    if (ir.data[i] == std::byte{0}) {
+                        break;
+                    }
+                }
+                return ir.read_bytes(i + 1);
+            }
+        case dw_form::block:
+            {
+                uleb128 l;
+                ir & l;
+                return ir.read_bytes(l);
+            }
+        case dw_form::block1:
+            {
+                uint8_t l;
+                ir & l;
+                return ir.read_bytes(l);
+            }
+        case dw_form::data1:
+            {
+                return ir.read_bytes(1);
+            }
+        case dw_form::flag:
+            {
+                uint8_t flag;
+                ir & flag;
+                return {};
+            }
+        case dw_form::sdata:
+            {
+                sleb128 l;
+                ir & l;
+                return {};
+            }
+        case dw_form::strp:
+            {
+                file_offset_size offset;
+                ir & offset;
+                return {};
+
+                //TODO
+                std::span<std::byte> string = {};//debug_str;
+                string = string.subspan(offset);
+                size_t i;
+                for (i = 0; i < string.size(); i++) {
+                    if (string[i] == std::byte{0}) {
+                        break;
+                    }
+                }
+                string = string.first(i);
+                return string;
+            }
+        case dw_form::udata:
+            {
+                uleb128 l;
+                ir & l;
+                return {};
+            }
+        case dw_form::ref_addr:
+            {
+                file_offset_size offset;
+                ir & offset;
+                return {};//TODO {debug_info.offset() + offset};
+            }
+        case dw_form::ref1:
+            {
+                uint8_t l;
+                ir & l;
+                return {};//TODO {cu.offset() + l};
+            }
+        case dw_form::ref2:
+            {
+                uint16_t l;
+                ir & l;
+                return {};//TODO {cu.offset() + l};
+            }
+        case dw_form::ref4:
+            {
+                uint32_t l;
+                ir & l;
+                return {};//TODO {cu.offset() + l};
+            }
+        case dw_form::ref8:
+            {
+                uint64_t l;
+                ir & l;
+                return {};//TODO {cu.offset() + l};
+            }
+        case dw_form::ref_udata:
+            {
+                uleb128 l;
+                ir & l;
+                return {};//TODO {cu.offset() + l};
+            }
+        case dw_form::indirect:
+            {
+                uleb128 v;
+                ir & v;
+                form = static_cast<dw_form>(static_cast<uint64_t>(v));
+                return read_form(ir, ar, form);
+            }
+        case dw_form::sec_offset:
+            {
+                file_offset_size offset;
+                ir & offset;
+                return {};//TODO {section.offset() + offset};
+            }
+        case dw_form::exprloc:
+            {
+                uleb128 l;
+                ir & l;
+                return ir.read_bytes(l);
+            }
+        case dw_form::flag_present:
+            {
+                return {};
+            }
+        case dw_form::ref_sig8:
+            {
+                uint64_t sig;
+                ir & sig;
+                return {};//TODO debug_types.get_type_by_signature(sig);
+            }
+    }
+}
+
 std::unordered_map<dw_tag, std::string> map_tag_to_string = {
     {dw_tag::array_type, "array_type"},
     {dw_tag::class_type, "class_type"},
@@ -123,102 +243,6 @@ std::unordered_map<dw_tag, std::string> map_tag_to_string = {
     {dw_tag::type_unit, "type_unit"},
     {dw_tag::rvalue_reference_type, "rvalue_reference_type"},
     {dw_tag::template_alias, "template_alias"},
-};
-enum class dw_at {
-    sibling = 0x01,
-    location = 0x02,
-    name = 0x03,
-    ordering = 0x09,
-    byte_size = 0x0b,
-    bit_offset = 0x0c,
-    bit_size = 0x0d,
-    stmt_list = 0x10,
-    low_pc = 0x11,
-    high_pc = 0x12,
-    language = 0x13,
-    discr = 0x15,
-    discr_value = 0x16,
-    visibility = 0x17,
-    import = 0x18,
-    string_length = 0x19,
-    common_reference = 0x1a,
-    comp_dir = 0x1b,
-    const_value = 0x1c,
-    containing_type = 0x1d,
-    default_value = 0x1e,
-    inline_ = 0x20,
-    is_optional = 0x21,
-    lower_bound = 0x22,
-    producer = 0x25,
-    prototyped = 0x27,
-    return_addr = 0x2a,
-    start_scope = 0x2c,
-    bit_stride = 0x2e,
-    upper_bound = 0x2f,
-    abstract_origin = 0x31,
-    accessibility = 0x32,
-    address_class = 0x33,
-    artificial = 0x34,
-    base_types = 0x35,
-    calling_convention = 0x36,
-    count = 0x37,
-    data_member_location = 0x38,
-    decl_column = 0x39,
-    decl_file = 0x3a,
-    decl_line = 0x3b,
-    declaration = 0x3c,
-    discr_list = 0x3d,
-    encoding = 0x3e,
-    external = 0x3f,
-    frame_base = 0x40,
-    friend_ = 0x41,
-    identifier_case = 0x42,
-    macro_info = 0x43,
-    namelist_item = 0x44,
-    priority = 0x45,
-    segment = 0x46,
-    specification = 0x47,
-    static_link = 0x48,
-    type = 0x49,
-    use_location = 0x4a,
-    variable_parameter = 0x4b,
-    virtuality = 0x4c,
-    vtable_elem_location = 0x4d,
-    allocated = 0x4e,
-    associated = 0x4f,
-    data_location = 0x50,
-    byte_stride = 0x51,
-    entry_pc = 0x52,
-    use_UTF8 = 0x53,
-    extension = 0x54,
-    ranges = 0x55,
-    trampoline = 0x56,
-    call_column = 0x57,
-    call_file = 0x58,
-    call_line = 0x59,
-    description = 0x5a,
-    binary_scale = 0x5b,
-    decimal_scale = 0x5c,
-    small = 0x5d,
-    decimal_sign = 0x5e,
-    digit_count = 0x5f,
-    picture_string = 0x60,
-    mutable_ = 0x61,
-    threads_scaled = 0x62,
-    explicit_ = 0x63,
-    object_pointer = 0x64,
-    endianity = 0x65,
-    elemental = 0x66,
-    pure = 0x67,
-    recursive = 0x68,
-    signature = 0x69,
-    main_subprogram = 0x6a,
-    data_bit_offset = 0x6b,
-    const_expr = 0x6c,
-    enum_class = 0x6d,
-    linkage_name = 0x6e,
-    lo_user = 0x2000,
-    hi_user = 0x3fff,
 };
 std::unordered_map<dw_at, std::string> map_at_to_string = {
     {dw_at::sibling, "sibling"},
@@ -314,33 +338,6 @@ std::unordered_map<dw_at, std::string> map_at_to_string = {
     {dw_at::enum_class, "enum_class"},
     {dw_at::linkage_name, "linkage_name"},
 };
-enum class dw_form {
-    addr = 0x01,
-    block2 = 0x03,
-    block4 = 0x04,
-    data2 = 0x05,
-    data4 = 0x06,
-    data8 = 0x07,
-    string = 0x08,
-    block = 0x09,
-    block1 = 0x0a,
-    data1 = 0x0b,
-    flag = 0x0c,
-    sdata = 0x0d,
-    strp = 0x0e,
-    udata = 0x0f,
-    ref_addr = 0x10,
-    ref1 = 0x11,
-    ref2 = 0x12,
-    ref4 = 0x13,
-    ref8 = 0x14,
-    ref_udata = 0x15,
-    indirect = 0x16,
-    sec_offset = 0x17,
-    exprloc = 0x18,
-    flag_present = 0x19,
-    ref_sig8 = 0x20,
-};
 std::unordered_map<dw_form, std::string> map_form_to_string = {
     {dw_form::addr, "addr"},
     {dw_form::block2, "block2"},
@@ -368,3 +365,43 @@ std::unordered_map<dw_form, std::string> map_form_to_string = {
     {dw_form::flag_present, "flag_present"},
     {dw_form::ref_sig8, "ref_sig8"},
 };
+
+using std::to_string;
+std::string to_string(enum dw_tag tag) {
+    auto it = map_tag_to_string.find(tag);
+    if (it != map_tag_to_string.end()) {
+        return it->second;
+    } else {
+        if (static_cast<size_t>(tag) >= static_cast<size_t>(dw_tag::lo_user) &&
+            static_cast<size_t>(tag) <= static_cast<size_t>(dw_tag::hi_user)) {
+            return "vendor specific dw_tag: " + to_string(static_cast<uint64_t>(tag));
+        } else {
+            return "unknown dw_tag: " + to_string(static_cast<uint64_t>(tag));
+        }
+    }
+}
+
+std::string to_string(enum dw_at attr) {
+    auto it = map_at_to_string.find(attr);
+    if (it != map_at_to_string.end()) {
+        return it->second;
+    } else {
+        if (static_cast<size_t>(attr) >= static_cast<size_t>(dw_at::lo_user) &&
+            static_cast<size_t>(attr) <= static_cast<size_t>(dw_at::hi_user)) {
+            return "vendor specific dw_at: " + to_string(static_cast<uint64_t>(attr));
+        } else {
+            return "unknown dw_at: " + to_string(static_cast<uint64_t>(attr));
+        }
+    }
+}
+
+std::string to_string(enum dw_form form) {
+    auto it = map_form_to_string.find(form);
+    if (it != map_form_to_string.end()) {
+        return it->second;
+    } else {
+        return "unknown dw_form: " + to_string(static_cast<uint64_t>(form));
+    }
+}
+
+}
