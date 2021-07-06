@@ -30,7 +30,7 @@ std::string to_string(attribute attr) {
 void read(span_reader &ir, span_reader &ar, attribute& a) {
     ar & a.name & a.form;
     if (!a.is_last()) {
-        a.data = read_form(ir, ar, a.form);
+        a.data = read_form(ir, a.form);
     }
 }
 void read(span_reader &r, debugging_information_entry& die) {
@@ -126,7 +126,7 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
     debug_abbrev_entry dae;
     while (true) {
         offset = debug_abbrev_reader.data.data() - debug_abbrev.data();
-        std::cout << "reading dae at offset " << offset << std::endl;
+        //std::cout << "reading dae at offset " << offset << std::endl;
         debug_abbrev_reader & dae;
         if (dae.is_last()) {
             throw std::runtime_error("no abbrev code found for die");
@@ -152,17 +152,10 @@ void dwarf::read_debug_info() {
     auto cu_it = cu_iter();
     for (compilation_unit_header cu: cu_it) {
         std::cout << "cu:" << std::endl;
-        span_reader debug_info_reader = cu_it.die_reader();
-        std::cout << "offset " << debug_info_reader.data.data() - debug_info.data() << std::endl;
 
-        while (true) {
-            //TODO
-            //cu_it.die_iter();
-            debugging_information_entry die;
-            debug_info_reader & die;
-            if (die.is_last()) {
-                break;
-            }
+        auto die_it = cu_it.die_iter();
+        for (; die_it != std::end(die_it); die_it++) {
+            debugging_information_entry die = *die_it;
             std::cout << "die:" << std::endl;
 
             size_t offset = find_abbrev(die.abbrev_code, cu);
@@ -172,6 +165,7 @@ void dwarf::read_debug_info() {
 
             std::cout << to_string(dae.tag) << std::endl;
 
+            span_reader debug_info_reader = die_it.debug_info_reader;
             while (true) {
                 attribute attr;
                 read(debug_info_reader, debug_abbrev_reader, attr);
@@ -181,6 +175,8 @@ void dwarf::read_debug_info() {
                     break;
                 }
             }
+            die_it.debug_info_reader = debug_info_reader;
+
             std::cout << std::endl;
         }
     }

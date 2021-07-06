@@ -20,7 +20,7 @@ void read(span_reader &r, enum dw_form& form) {
     r & v;
     form = static_cast<dw_form>(static_cast<uint64_t>(v));
 }
-std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
+std::span<std::byte> read_form(span_reader &ir, dw_form form) {
     switch (form) {
         case dw_form::addr:
             {
@@ -155,7 +155,7 @@ std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form) {
                 uleb128 v;
                 ir & v;
                 form = static_cast<dw_form>(static_cast<uint64_t>(v));
-                return read_form(ir, ar, form);
+                return read_form(ir, form);
             }
         case dw_form::sec_offset:
             {

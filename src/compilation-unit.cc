@@ -40,7 +40,7 @@ span_reader compilation_unit_header::iterator::die_reader() {
     return debug_info_reader;
 }
 debugging_information_entry::iterator compilation_unit_header::iterator::die_iter() {
-    return debugging_information_entry::iterator{d};
+    return debugging_information_entry::iterator{d, debug_info_reader};
 }
 
 compilation_unit_header::iterator compilation_unit_header::iterator::begin() const {

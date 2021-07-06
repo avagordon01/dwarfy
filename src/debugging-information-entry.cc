@@ -16,13 +16,12 @@ debugging_information_entry::iterator::iterator():
     debug_info_reader({}),
     debug_abbrev_reader({})
 {}
-debugging_information_entry::iterator::iterator(dwarf* d_):
+debugging_information_entry::iterator::iterator(dwarf* d_, span_reader debug_info_reader_):
     d(d_),
-    debug_info_reader(d->debug_info),
+    debug_info_reader(debug_info_reader_),
     debug_abbrev_reader(d->debug_abbrev)
 {
     debug_abbrev_reader.file_endianness = d->initial_endianness;
-    debug_info_reader.file_endianness = d->initial_endianness;
     debug_info_reader & die;
 }
 const debugging_information_entry debugging_information_entry::iterator::operator*() const {

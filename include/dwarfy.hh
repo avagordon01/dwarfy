@@ -53,7 +53,7 @@ struct attribute {
         return static_cast<uint64_t>(name) == 0 && static_cast<uint64_t>(form) == 0;
     }
 };
-std::span<std::byte> read_form(span_reader &ir, span_reader &ar, dw_form form);
+std::span<std::byte> read_form(span_reader &ir, dw_form form);
 void read(span_reader &ir, span_reader &ar, attribute& a);
 std::string to_string(attribute attr);
 
@@ -68,10 +68,10 @@ struct debugging_information_entry {
 };
 class debugging_information_entry::iterator {
     dwarf* d;
+public:
     span_reader debug_info_reader;
     span_reader debug_abbrev_reader;
     debugging_information_entry die;
-public:
     using iterator_concept  = std::input_iterator_tag;
     using difference_type   = std::ptrdiff_t;
     using value_type        = debugging_information_entry;
@@ -80,7 +80,7 @@ public:
     bool operator==(sentinel);
     sentinel end() const;
     iterator();
-    iterator(dwarf* d_);
+    iterator(dwarf* d_, span_reader debug_info_reader_);
     const debugging_information_entry operator*() const;
     iterator& operator++();
     iterator operator++(int);
