@@ -1,4 +1,5 @@
 #include "dwarfy.hh"
+#include <cstring>
 
 namespace dwarfy {
 
@@ -144,8 +145,73 @@ size_t dwarf::find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu) {
     }
 }
 
+struct target_address {
+    uint64_t segment = 0;
+    uint64_t address = 0;
+};
+void read(span_reader &r, target_address& addr) {
+    auto s = r.read_bytes(r.machine_segment_size);
+    std::memcpy(&addr.segment, s.data(), r.machine_segment_size);
+    auto a = r.read_bytes(r.machine_address_size);
+    std::memcpy(&addr.address, a.data(), r.machine_address_size);
+}
+
+struct arange_unit_header {
+    initial_length unit_length;
+    uint16_t version;
+    file_offset_size debug_info_offset;
+    uint8_t machine_address_size;
+    uint8_t machine_segment_size;
+};
+void read(span_reader &r, arange_unit_header& au) {
+    r & au.unit_length & au.version & au.debug_info_offset & au.machine_address_size & au.machine_segment_size;
+    if (au.machine_segment_size > 8) {
+        throw std::runtime_error("error, dwarfy doesn't support segment sizes over 8 bytes");
+    }
+    if (au.machine_address_size > 8) {
+        throw std::runtime_error("error, dwarfy doesn't support address sizes over 8 bytes");
+    }
+    r.machine_segment_size = au.machine_segment_size;
+    r.machine_address_size = au.machine_address_size;
+}
+
+struct arange_descriptor {
+    target_address address;
+    machine_address_size length;
+    bool is_last() {
+        return address.segment == 0 && address.address == 0 && length == 0;
+    }
+};
+void read(span_reader &r, arange_descriptor& ad) {
+    r & ad.address & ad.length;
+}
+
+void dwarf::address_to_cu_arange() {
+    target_address addr;
+
+    span_reader debug_aranges_reader {debug_aranges};
+    while (!debug_aranges_reader.data.empty()) {
+        arange_unit_header au;
+        debug_aranges_reader & au;
+        std::cout << "read arange unit header" << std::endl;
+        size_t mod = debug_aranges_reader.machine_segment_size + 2 * debug_aranges_reader.machine_address_size;
+        size_t offset = debug_aranges_reader.data.data() - debug_aranges.data();
+        if (offset % mod != 0) {
+            offset = mod - (offset % mod);
+        }
+        debug_aranges_reader.read_bytes(offset);
+        while (true) {
+            arange_descriptor ad;
+            debug_aranges_reader & ad;
+            if (ad.is_last()) {
+                break;
+            }
+            std::cout << "read arange descriptor" << std::endl;
+        }
+    }
+}
+
 void dwarf::read_debug_info() {
-    std::cout << to_string(debug_info) << std::endl;
     span_reader debug_abbrev_reader {debug_abbrev};
     debug_abbrev_reader.file_endianness = initial_endianness;
 

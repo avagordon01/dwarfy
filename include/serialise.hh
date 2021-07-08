@@ -8,6 +8,7 @@
 struct span_reader {
     std::span<std::byte> data;
     size_t file_offset_size;
+    size_t machine_segment_size;
     size_t machine_address_size;
     //XXX ELF doesn't distinguish between file bitwidth and machine bitwidth, but DWARF does
     std::endian file_endianness;

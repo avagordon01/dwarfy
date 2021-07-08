@@ -227,6 +227,8 @@ struct dwarf {
     size_t find_abbrev(uleb128 abbrev_code, compilation_unit_header& cu);
 
     compilation_unit_header::iterator cu_iter();
+
+    void address_to_cu_arange();
 };
 
 }
