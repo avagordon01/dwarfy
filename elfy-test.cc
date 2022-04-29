@@ -29,45 +29,55 @@ void do_stuff(std::span<std::byte> data) {
     std::cout << "all good" << std::endl;
 }
 
-int main(int argc, char *argv[]) {
-    for (argv++, argc--; argc > 0; argv++, argc--) {
-        char* filename = *argv;
-        int fd = open(filename, O_RDONLY);
+struct mmap_file {
+    std::span<std::byte> data;
+    std::string filename;
+    int fd;
+    mmap_file(std::string filename_):
+        filename(filename_)
+    {
+        fd = open(filename.c_str(), O_RDONLY);
         if (fd < 0) {
-            fprintf(stderr, "%s: %s\n", filename, strerror(errno));
-            return 1;
+            throw std::runtime_error(filename + ": " + strerror(errno));
         }
         struct stat st;
         int err = fstat(fd, &st);
         if (err < 0) {
-            fprintf(stderr, "%s: %s\n", filename, strerror(errno));
-            return 1;
+            throw std::runtime_error(filename + ": " + strerror(errno));
         }
         size_t len = st.st_size;
         void* addr = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
         if (addr == MAP_FAILED) {
-            fprintf(stderr, "%s: %s\n", filename, strerror(errno));
-            return 1;
+            throw std::runtime_error(filename + ": " + strerror(errno));
         }
+
+        data = {static_cast<std::byte*>(addr), len};
+    }
+
+    ~mmap_file() {
+        int err = munmap(data.data(), data.size());
+        if (err < 0) {
+            throw std::runtime_error(filename + ": " + strerror(errno));
+        }
+        err = close(fd);
+        if (fd < 0) {
+            throw std::runtime_error(filename + ": " + strerror(errno));
+        }
+    }
+};
+
+int main(int argc, char *argv[]) {
+    for (argv++, argc--; argc > 0; argv++, argc--) {
+        char* filename = *argv;
+        mmap_file mf{filename};
 
         try {
             printf("processing file '%s':\n", filename);
-            do_stuff(std::span<std::byte>{static_cast<std::byte*>(addr), len});
+            do_stuff(mf.data);
         } catch (std::runtime_error &e) {
             fprintf(stderr, "error processing file '%s': %s\n", filename, e.what());
         } catch (std::invalid_argument &e) {
             fprintf(stderr, "error processing file '%s': %s\n", filename, e.what());
-        }
-
-        err = munmap(addr, len);
-        if (err < 0) {
-            fprintf(stderr, "%s: %s\n", filename, strerror(errno));
-            return 1;
-        }
-        err = close(fd);
-        if (fd < 0) {
-            fprintf(stderr, "%s: %s\n", filename, strerror(errno));
-            return 1;
         }
     }
     return 0;

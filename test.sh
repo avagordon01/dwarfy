@@ -10,4 +10,5 @@ if [[ ! -d out ]]; then
 fi
 meson install -C out --only-changed
 
-time ./packaged/bin/elfy-test $(rg -luuu ELF /usr/bin)
+./packaged/bin/elfy-test ../profiler/flocking-demo
+#./packaged/bin/elfy-test tmp/myfile

@@ -15,6 +15,7 @@ add_project_arguments(
   '-Wno-unused-function',
   '-Wno-unused-parameter',
   '-Wno-unused-private-field',
+  '-Wno-exceptions',
   '-fdebug-default-version=4',
   language: 'cpp'
 )
