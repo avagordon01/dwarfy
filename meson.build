@@ -20,12 +20,6 @@ add_project_arguments(
   language: 'cpp'
 )
 
-expected_dep = declare_dependency(
-  include_directories: [
-    'vendor/expected/include',
-  ]
-)
-
 dwarfy_lib = static_library('dwarfy',
   'src/elf.cc',
   'src/dwarf.cc',
@@ -53,7 +47,6 @@ executable(
     'elfy-test.cc',
   ],
   dependencies: [
-    expected_dep,
     dwarfy_dep,
   ],
   install: true,

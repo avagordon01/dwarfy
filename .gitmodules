@@ -1,3 +1,0 @@
-[submodule "expected"]
-	path = vendor/expected
-	url = git@github.com:TartanLlama/expected.git
