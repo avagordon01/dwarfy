@@ -1,5 +1,6 @@
 #include "dwarfy.hh"
 #include <cstring>
+#include <vector>
 
 namespace dwarfy {
 

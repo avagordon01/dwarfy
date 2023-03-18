@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <bit>
 #include <algorithm>
+#include <stdexcept>
 
 struct span_reader {
     std::span<std::byte> data;

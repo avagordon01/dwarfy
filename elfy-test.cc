@@ -14,7 +14,7 @@
 
 void do_stuff(std::span<std::byte> data) {
     elfy::elf e{data};
-    if (false) {
+    if (true) {
     size_t i = 0;
     std::optional<elfy::section_header> sh;
     while ((sh = e.get_section_by_id(i++))) {
