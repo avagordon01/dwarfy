@@ -26,7 +26,6 @@ dwarfy_lib = static_library('dwarfy',
   'src/enums.cc',
   'src/compilation-unit.cc',
   'src/debugging-information-entry.cc',
-  'src/leb128.cc',
   include_directories: [
     'include',
   ],
