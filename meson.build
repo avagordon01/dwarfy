@@ -29,6 +29,9 @@ dwarfy_lib = static_library('dwarfy',
   include_directories: [
     'include',
   ],
+  dependencies: [
+    dependency('range-v3'),
+  ],
   install: true,
 )
 dwarfy_dep = declare_dependency(

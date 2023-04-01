@@ -10,7 +10,6 @@
 
 #include "elfy.hh"
 #include "dwarfy.hh"
-#include "leb128.hh"
 
 void do_stuff(std::span<std::byte> data) {
     elfy::elf e{data};

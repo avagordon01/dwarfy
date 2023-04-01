@@ -154,6 +154,16 @@ void read(R& r, section_header& h) {
     r & h.name_ & h.type & h.flags & h.addr & h.offset & h.size & h.link & h.info & h.addralign & h.entsize;
 }
 
+template<typename T>
+int bytes_to_type_range(
+    size_t num,
+    size_t byte_offset,
+    size_t byte_stride,
+    T deserialise
+) {
+    return 0;
+}
+
 class elf {
     std::span<std::byte> data;
     span_reader reader;
@@ -165,6 +175,14 @@ public:
         reader(data)
     {
         reader & ident & header;
+    }
+    auto programs() {
+        return bytes_to_type_range(
+            header.phnum,
+            header.phoff,
+            header.phentsize,
+            [&](){ reader & header; }
+        );
     }
     std::optional<program_header> get_program_by_id(size_t id) {
         if (id >= header.phnum) {
